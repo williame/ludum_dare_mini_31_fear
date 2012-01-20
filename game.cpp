@@ -13,7 +13,7 @@ const char* const main_t::game_name = "Ludum Dare Mini 31 - Fear"; // window tit
 class main_game_t: public main_t, private main_t::file_io_t {
 public:
 	main_game_t(void* platform_ptr): main_t(platform_ptr),
-		active_model(NULL), mouse_down(false) {}
+		mode(MODE_EDIT), active_model(NULL), mouse_down(false) {}
 	void init();
 	bool tick();
 	void on_io(const std::string& name,bool ok,const std::string& bytes,intptr_t data);
@@ -26,6 +26,9 @@ private:
 	enum {
 		LOAD_GAME_XML,
 	};
+	enum {
+		MODE_EDIT,
+	} mode;
 	xml_parser_t game_xml;
 	glm::vec2 screen_centre;
 	struct model_t;
@@ -71,14 +74,14 @@ void main_game_t::on_io(const std::string& name,bool ok,const std::string& bytes
 	case LOAD_GAME_XML: {
 		game_xml = xml_parser_t(name,bytes);
 		xml_walker_t xml(game_xml.walker());
-		xml.check("game").get_child("artwork");
-		for(int i=0; xml.get_child("art",i); i++, xml.up()) {
+		xml.check("game").get_child("scenary");
+		for(int i=0; xml.get_child("asset",i); i++, xml.up()) {
 			const std::string id = xml.value_string("id"),
 				type = xml.value_string("type"), 
 				path = xml.value_string("path");
 			const float scaler = xml.has_key("scale_factor")? xml.value_float("scale_factor"):1.0;
 			if(models.find(id) != models.end())
-				data_error("dupicate art ID " << id);
+				data_error("dupicate asset ID " << id);
 			if(type == "g3d") {
 				std::cout << "loading G3D " << path << std::endl;
 				models[id] = new model_t(*this,path,scaler);
