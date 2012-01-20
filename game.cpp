@@ -17,7 +17,7 @@ const char* const main_t::game_name = "Ludum Dare Mini 31 - Fear"; // window tit
 class main_game_t: public main_t, private main_t::file_io_t {
 public:
 	main_game_t(void* platform_ptr): main_t(platform_ptr),
-		mode(MODE_EDIT), active_model(NULL), mouse_down(false) {}
+		mode(MODE_LOAD), active_model(NULL), mouse_down(false) {}
 	void init();
 	bool tick();
 	void on_io(const std::string& name,bool ok,const std::string& bytes,intptr_t data);
@@ -27,22 +27,26 @@ public:
 	bool on_mouse_down(int x,int y,mouse_button_t button,const input_key_map_t& map,const input_mouse_map_t& mouse);
 	bool on_mouse_up(int x,int y,mouse_button_t button,const input_key_map_t& map,const input_mouse_map_t& mouse);
 private:
+	struct artwork_t;
+	friend struct artwork_t;
+	void on_ready(artwork_t* artwork);
+	bool is_ready() const;
 	void save();
 	enum {
 		LOAD_GAME_XML,
 	};
 	enum {
+		MODE_LOAD,
 		MODE_EDIT,
 	} mode;
 	xml_parser_t game_xml;
 	glm::vec2 screen_centre;
-	struct artwork_t;
 	typedef std::map<std::string,artwork_t*> artworks_t;
 	artworks_t artwork;
 	artwork_t* active_model;
-	struct instance_t;
-	typedef std::vector<instance_t*> instances_t;
-	instances_t instances;
+	struct object_t;
+	typedef std::vector<object_t*> objects_t;
+	objects_t objects;
 	glm::vec2 pan_rate;
 	bool mouse_down;
 	float mouse_x, mouse_y;
@@ -56,18 +60,21 @@ struct main_game_t::artwork_t: public g3d_t, public g3d_t::loaded_t {
 		CLS_BACK = 50,
 		CLS_MONSTER = 30,
 	};
-	artwork_t(main_t& main,const std::string& id_,const std::string& p,class_t c,float s):
-		g3d_t(main,p,this), id(id_), path(p), cls(c), tx(glm::scale(glm::vec3(s,s,s))) {}
+	artwork_t(main_game_t& main,const std::string& id_,const std::string& p,class_t c,float s):
+		g3d_t(main,p,this), game(main), id(id_), path(p), cls(c), tx(glm::scale(glm::vec3(s,s,s))), scale_factor(s) {}
+	main_game_t& game;
 	const std::string id, path;
 	class_t cls;
 	const glm::mat4 tx;
+	const float scale_factor;
 	void on_g3d_loaded(g3d_t& g3d,bool ok,intptr_t data) {
 		if(!ok) data_error("failed to load " << filename);
+		game.on_ready(this);
 	}
 };
 
-struct main_game_t::instance_t {
-	instance_t(artwork_t& a,const glm::vec2& p):
+struct main_game_t::object_t {
+	object_t(artwork_t& a,const glm::vec2& p):
 		artwork(a), pos(p), tx(glm::translate(glm::vec3(p,-a.cls))*a.tx) {}
 	artwork_t& artwork;
 	glm::vec2 pos;
@@ -80,6 +87,12 @@ void main_game_t::init() {
 	read_file("data/game.xml",this,LOAD_GAME_XML);
 }
 
+bool main_game_t::is_ready() const {
+	for(artworks_t::const_iterator a=artwork.begin(); a!=artwork.end(); a++)
+		if(!a->second->is_ready())
+			return false;
+	return true;
+}
 
 void main_game_t::on_io(const std::string& name,bool ok,const std::string& bytes,intptr_t data) {
 	if(!ok) data_error("could not load " << name);
@@ -114,6 +127,23 @@ void main_game_t::on_io(const std::string& name,bool ok,const std::string& bytes
 	}
 }
 
+void main_game_t::on_ready(artwork_t*) {
+	if(is_ready()) {
+		std::cout << "artwork all loaded" << std::endl;
+		mode = MODE_EDIT;
+		xml_walker_t xml(game_xml.walker());
+		xml.check("game").get_child("level");
+		for(int i=0; xml.get_child("object",i); i++, xml.up()) {
+			const std::string asset = xml.value_string("asset");
+			const float x = xml.value_float("x"), y = xml.value_float("y");
+			if(artwork.find(asset) == artwork.end())
+				data_error("unresolved asset ID " << asset);
+			objects.push_back(new object_t(*artwork[asset],glm::vec2(x,y)));
+		}
+		xml.up();
+	}
+}
+
 bool main_game_t::tick() {
 	static float time = 0.0;
 	time += 0.01;
@@ -124,8 +154,8 @@ bool main_game_t::tick() {
 		screen_centre.y-height/2,screen_centre.y+height/2, // y increases upwards
 		1,90));
 	const glm::vec3 light0(10,10,10);
-	// show all the instances
-	for(instances_t::iterator i=instances.begin(); i!=instances.end(); i++)
+	// show all the objects
+	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
 		(*i)->artwork.draw(time,projection,(*i)->tx,light0);
 	// show active model on top for editing
 	if(active_model && mouse_down) {
@@ -137,21 +167,25 @@ bool main_game_t::tick() {
 }
 
 void main_game_t::save() {
+	if(mode != MODE_EDIT) {
+		std::cout << "cannot save whilst not editing" << std::endl;
+		return;
+	}
 	std::cout << "saving..." << std::endl;
 	std::stringstream xml(std::ios_base::out|std::ios_base::ate);
 	xml << "<game>\n\t<artwork>\n";
 	for(artworks_t::iterator a=artwork.begin(); a!=artwork.end(); a++)
-		xml << "\t\t<artwork id=\"" << a->first << "\" type=\"g3d\" class=\"" <<
+		xml << "\t\t<asset id=\"" << a->first << "\" type=\"g3d\" class=\"" <<
 			(a->second->cls == artwork_t::CLS_BACK?"back":"monster") <<
-			"\" path=\"" << a->second->path << "\"/>\n";
+			"\" path=\"" << a->second->path << "\" scale_factor=\"" << a->second->scale_factor << "\"/>\n";
 	xml << "\t</artwork>\n\t<level>\n";
-	for(instances_t::iterator i=instances.begin(); i!=instances.end(); i++)
-		xml << "\t\t<instance id=\"" << (*i)->artwork.id << "\" x=\"" << (*i)->pos.x << "\" y=\"" << (*i)->pos.y << "\"/>\n"; 
+	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
+		xml << "\t\t<object asset=\"" << (*i)->artwork.id << "\" x=\"" << (*i)->pos.x << "\" y=\"" << (*i)->pos.y << "\"/>\n"; 
 	xml << "\t</level>\n</game>\n";
 #ifdef __native_client__
 	std::cout << xml.str();
 #else
-	std::fstream out("data/game.xml",std::fstream::in |std::fstream::out);
+	std::fstream out("data/game.xml",std::fstream::out);
 	out << xml.str();
 	out.close();
 #endif
@@ -203,9 +237,9 @@ bool main_game_t::on_mouse_down(int x,int y,mouse_button_t button,const input_ke
 bool main_game_t::on_mouse_up(int x,int y,mouse_button_t button,const input_key_map_t& map,const input_mouse_map_t& mouse) {
 	mouse_down = false;
 	if(active_model) {
-		std::cout << "creating new instance of " << active_model->filename << std::endl;
+		std::cout << "creating new object of " << active_model->filename << std::endl;
 		const glm::vec2 pos(screen_centre.x+mouse_x-width/2,screen_centre.y-mouse_y+height/2);
-		instances.push_back(new instance_t(*active_model,pos));
+		objects.push_back(new object_t(*active_model,pos));
 	} else
 		std::cout << "on_mouse_up without active_model" << std::endl;
 	return true;
