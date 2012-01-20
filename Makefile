@@ -27,6 +27,7 @@ CFLAGS += -DBUILD_TIMESTAMP=\"$(shell date +%y%m%d-%H%M%S)\" -DGIT_INFO=\"$(shel
 	
 OBJ_BASE_CPP = \
 	game.opp \
+	shaders.opp \
 	barebones/xml.opp \
 	barebones/g3d.opp \
 	barebones/build_info.opp \
