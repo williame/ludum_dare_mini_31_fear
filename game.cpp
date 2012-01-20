@@ -12,7 +12,8 @@ const char* const main_t::game_name = "Ludum Dare Mini 31 - Fear"; // window tit
 
 class main_game_t: public main_t, private main_t::file_io_t {
 public:
-	main_game_t(void* platform_ptr): main_t(platform_ptr) {}
+	main_game_t(void* platform_ptr): main_t(platform_ptr),
+		active_model(NULL), mouse_down(false) {}
 	void init();
 	bool tick();
 	void on_io(const std::string& name,bool ok,const std::string& bytes,intptr_t data);
@@ -30,7 +31,10 @@ private:
 	struct model_t;
 	typedef std::map<std::string,model_t*> models_t;
 	models_t models;
+	model_t* active_model;
 	glm::vec2 pan_rate;
+	bool mouse_down;
+	float mouse_x, mouse_y;
 	static const float PAN_RATE;
 };
 
@@ -48,6 +52,7 @@ struct main_game_t::model_t: public g3d_t, public g3d_t::loaded_t {
 void main_game_t::init() {
 	create_shaders(*this);
 	glClearColor(.4,.2,.6,1.);
+	glFrontFace(GL_CW); // we've got our y coords upside down
 	read_file("data/game.xml",this,LOAD_GAME_XML);
 }
 
@@ -66,9 +71,10 @@ void main_game_t::on_io(const std::string& name,bool ok,const std::string& bytes
 			const float scaler = xml.has_key("scale_factor")? xml.value_float("scale_factor"):1.0;
 			if(models.find(id) != models.end())
 				data_error("dupicate art ID " << id);
-			if(type == "g3d")
+			if(type == "g3d") {
 				models[id] = new model_t(*this,path,scaler);
-			else
+				if(!active_model) active_model = models[id];
+			} else
 				data_error("unsupported artwork type "<<type);
 		}
 		xml.up();
@@ -85,11 +91,17 @@ bool main_game_t::tick() {
 	screen_centre += pan_rate;
 	const glm::mat4 projection(glm::ortho<float>(
 		screen_centre.x-width/2,screen_centre.x+width/2,
-		screen_centre.y-height/2,screen_centre.y+height/2,
+		screen_centre.y+height/2,screen_centre.y-height/2,
 		FLT_MIN,FLT_MAX));
-	const glm::mat4 modelview(glm::translate(glm::vec3(0,0,-50)));
+	const glm::mat4 modelview(glm::translate(glm::vec3(0,0,50)));
+	const glm::vec3 light0(10,10,10);
 	for(models_t::iterator m=models.begin(); m!=models.end(); m++)
-		m->second->draw(time,projection,modelview*m->second->tx,glm::vec3(10,10,10));
+		m->second->draw(time,projection,modelview*m->second->tx,light0);
+	// show active model
+	if(active_model && mouse_down)
+		active_model->draw(time,projection,
+			glm::translate(glm::vec3(screen_centre.x+mouse_x-width/2,screen_centre.y+mouse_y-height/2,25))*active_model->tx,
+			light0,glm::vec4(1,0,.2,.4));
 	return true; // return false to exit program
 }
 
@@ -99,10 +111,21 @@ main_t* main_t::create(void* platform_ptr,int argc,char** args) {
 
 bool main_game_t::on_key_down(short code,const input_key_map_t& map,const input_mouse_map_t& mouse) {
 	switch(code) {
-	case KEY_LEFT: pan_rate.x = -PAN_RATE; return true;
-	case KEY_RIGHT: pan_rate.x = PAN_RATE; return true;
-	case KEY_UP: pan_rate.y = -PAN_RATE; return true;
-	case KEY_DOWN: pan_rate.y = PAN_RATE; return true;
+	case KEY_LEFT: pan_rate.x = PAN_RATE; return true;
+	case KEY_RIGHT: pan_rate.x = -PAN_RATE; return true;
+	case KEY_UP: pan_rate.y = PAN_RATE; return true;
+	case KEY_DOWN: pan_rate.y = -PAN_RATE; return true;
+	case ' ': {
+			bool next = !active_model;
+			for(models_t::iterator m=models.begin(); m!=models.end(); m++)
+				if(next) {
+					active_model = m->second;
+					break;
+				} else
+					next = m->second == active_model;
+			if(next)
+				active_model = models.begin()->second;
+	} return true;
 	default: return false;
 	}
 	return false;
@@ -120,9 +143,13 @@ bool main_game_t::on_key_up(short code,const input_key_map_t& map,const input_mo
 }
 
 bool main_game_t::on_mouse_down(int x,int y,mouse_button_t button,const input_key_map_t& map,const input_mouse_map_t& mouse) {
-	return false;
+	mouse_down = true;
+	mouse_x = x;
+	mouse_y = y;
+	return true;
 }
 
 bool main_game_t::on_mouse_up(int x,int y,mouse_button_t button,const input_key_map_t& map,const input_mouse_map_t& mouse) {
-	return false;
+	mouse_down = false;
+	return true;
 }
