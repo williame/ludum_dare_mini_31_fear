@@ -1,6 +1,10 @@
 #include <iostream>
 #include <map>
 
+#ifndef __native_client__
+	#include <fstream>
+#endif
+
 #include "barebones/main.hpp"
 #include "barebones/xml.hpp"
 #include "barebones/g3d.hpp"
@@ -52,9 +56,9 @@ struct main_game_t::artwork_t: public g3d_t, public g3d_t::loaded_t {
 		CLS_BACK = 50,
 		CLS_MONSTER = 30,
 	};
-	artwork_t(main_t& main,const std::string& p,class_t c,float s):
-		g3d_t(main,p,this), path(p), cls(c), tx(glm::scale(glm::vec3(s,s,s))) {}
-	const std::string path;
+	artwork_t(main_t& main,const std::string& id_,const std::string& p,class_t c,float s):
+		g3d_t(main,p,this), id(id_), path(p), cls(c), tx(glm::scale(glm::vec3(s,s,s))) {}
+	const std::string id, path;
 	class_t cls;
 	const glm::mat4 tx;
 	void on_g3d_loaded(g3d_t& g3d,bool ok,intptr_t data) {
@@ -63,8 +67,10 @@ struct main_game_t::artwork_t: public g3d_t, public g3d_t::loaded_t {
 };
 
 struct main_game_t::instance_t {
-	instance_t(artwork_t& m,const glm::vec3& pos): model(m), tx(glm::translate(pos)*m.tx) {}
-	artwork_t& model;
+	instance_t(artwork_t& a,const glm::vec2& p):
+		artwork(a), pos(p), tx(glm::translate(glm::vec3(p,-a.cls))*a.tx) {}
+	artwork_t& artwork;
+	glm::vec2 pos;
 	glm::mat4 tx;
 };
 
@@ -96,7 +102,7 @@ void main_game_t::on_io(const std::string& name,bool ok,const std::string& bytes
 				data_error("dupicate asset ID " << id);
 			if(type == "g3d") {
 				std::cout << "loading G3D " << path << std::endl;
-				artwork[id] = new artwork_t(*this,path,cls,scaler);
+				artwork[id] = new artwork_t(*this,id,path,cls,scaler);
 				if(!active_model) active_model = artwork[id];
 			} else
 				data_error("unsupported artwork type "<<type);
@@ -120,7 +126,7 @@ bool main_game_t::tick() {
 	const glm::vec3 light0(10,10,10);
 	// show all the instances
 	for(instances_t::iterator i=instances.begin(); i!=instances.end(); i++)
-		(*i)->model.draw(time,projection,(*i)->tx,light0);
+		(*i)->artwork.draw(time,projection,(*i)->tx,light0);
 	// show active model on top for editing
 	if(active_model && mouse_down) {
 		active_model->draw(time,projection,
@@ -135,11 +141,20 @@ void main_game_t::save() {
 	std::stringstream xml(std::ios_base::out|std::ios_base::ate);
 	xml << "<game>\n\t<artwork>\n";
 	for(artworks_t::iterator a=artwork.begin(); a!=artwork.end(); a++)
-		xml << "\t\t<artwork id=\"" <<a->first << "\" type=\"g3d\" class=\"" <<
+		xml << "\t\t<artwork id=\"" << a->first << "\" type=\"g3d\" class=\"" <<
 			(a->second->cls == artwork_t::CLS_BACK?"back":"monster") <<
 			"\" path=\"" << a->second->path << "\"/>\n";
-	xml << "\t</artwork>\n\t<level>\n\t</level>\n</game>\n";
+	xml << "\t</artwork>\n\t<level>\n";
+	for(instances_t::iterator i=instances.begin(); i!=instances.end(); i++)
+		xml << "\t\t<instance id=\"" << (*i)->artwork.id << "\" x=\"" << (*i)->pos.x << "\" y=\"" << (*i)->pos.y << "\"/>\n"; 
+	xml << "\t</level>\n</game>\n";
+#ifdef __native_client__
 	std::cout << xml.str();
+#else
+	std::fstream out("data/game.xml",std::fstream::in |std::fstream::out);
+	out << xml.str();
+	out.close();
+#endif
 }
 
 bool main_game_t::on_key_down(short code,const input_key_map_t& map,const input_mouse_map_t& mouse) {
@@ -189,12 +204,8 @@ bool main_game_t::on_mouse_up(int x,int y,mouse_button_t button,const input_key_
 	mouse_down = false;
 	if(active_model) {
 		std::cout << "creating new instance of " << active_model->filename << std::endl;
-		instances.push_back(new instance_t(*active_model,
-			glm::vec3(
-				screen_centre.x+mouse_x-width/2,
-				screen_centre.y-mouse_y+height/2,
-				-active_model->cls // happens to be z-value
-			)));
+		const glm::vec2 pos(screen_centre.x+mouse_x-width/2,screen_centre.y-mouse_y+height/2);
+		instances.push_back(new instance_t(*active_model,pos));
 	} else
 		std::cout << "on_mouse_up without active_model" << std::endl;
 	return true;
