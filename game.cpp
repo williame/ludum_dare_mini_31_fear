@@ -30,7 +30,11 @@ private:
 	struct model_t;
 	typedef std::map<std::string,model_t*> models_t;
 	models_t models;
+	glm::vec2 pan_rate;
+	static const float PAN_RATE;
 };
+
+const float main_game_t::PAN_RATE = 10;
 
 struct main_game_t::model_t: public g3d_t, public g3d_t::loaded_t {
 	model_t(main_t& main,const std::string& filename,float s):
@@ -78,6 +82,7 @@ bool main_game_t::tick() {
 	static float time = 0.0;
 	time += 0.01;
 	if(time > 1.0) time -= 1.0;
+	screen_centre += pan_rate;
 	const glm::mat4 projection(glm::ortho<float>(
 		screen_centre.x-width/2,screen_centre.x+width/2,
 		screen_centre.y-height/2,screen_centre.y+height/2,
@@ -92,37 +97,32 @@ main_t* main_t::create(void* platform_ptr,int argc,char** args) {
 	return new main_game_t(platform_ptr);
 }
 
-// pure debug code to be chopped out below:
-
-static void print_debug_input_map(const main_t::input_key_map_t& map,const main_t::input_mouse_map_t& mouse) {
-	for(size_t i=0; i<map.size(); i++)
-		if(map[i])
-			std::cout << "key " << i << " down" << std::endl;
-	for(size_t i=0; i<mouse.size(); i++)
-		if(mouse[i])
-			std::cout << "mouse " << i << " down" << std::endl;
-}
-
 bool main_game_t::on_key_down(short code,const input_key_map_t& map,const input_mouse_map_t& mouse) {
-	std::cout << "KEY " << code << " DOWN" << std::endl;
-	print_debug_input_map(map,mouse);
+	switch(code) {
+	case KEY_LEFT: pan_rate.x = -PAN_RATE; return true;
+	case KEY_RIGHT: pan_rate.x = PAN_RATE; return true;
+	case KEY_UP: pan_rate.y = -PAN_RATE; return true;
+	case KEY_DOWN: pan_rate.y = PAN_RATE; return true;
+	default: return false;
+	}
 	return false;
 }
 
 bool main_game_t::on_key_up(short code,const input_key_map_t& map,const input_mouse_map_t& mouse) {
-	std::cout << "KEY " << code << " UP" << std::endl;
-	print_debug_input_map(map,mouse);
+	switch(code) {
+	case KEY_LEFT:
+	case KEY_RIGHT: pan_rate.x = 0; return true;
+	case KEY_UP:
+	case KEY_DOWN: pan_rate.y = 0; return true;
+	default: return false;
+	}
 	return false;
 }
 
 bool main_game_t::on_mouse_down(int x,int y,mouse_button_t button,const input_key_map_t& map,const input_mouse_map_t& mouse) {
-	std::cout << "MOUSE " << x << ',' << y << ',' << button << " DOWN" << std::endl;
-	print_debug_input_map(map,mouse);
 	return false;
 }
 
 bool main_game_t::on_mouse_up(int x,int y,mouse_button_t button,const input_key_map_t& map,const input_mouse_map_t& mouse) {
-	std::cout << "MOUSE " << x << ',' << y << ',' << button << " UP" << std::endl;
-	print_debug_input_map(map,mouse);
 	return false;
 }
