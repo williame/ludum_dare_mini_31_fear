@@ -1,9 +1,9 @@
 <game>
-	<scenary>
-		<asset id="w1" type="g3d" path="data/tunnel_back1.g3d" scale_factor="20"/>
-		<asset id="w2" type="g3d" path="data/spider1.g3d" scale_factor="20"/>
-		<asset id="w3" type="g3d" path="data/spider_run.g3d" scale_factor="20"/>
-	</scenary>
-	<levels>
-	</levels>
+	<artwork>
+		<asset id="w1" type="g3d" class="back" path="data/tunnel_back1.g3d" scale_factor="20"/>
+		<asset id="w2" type="g3d" class="monster" path="data/spider1.g3d" scale_factor="20"/>
+		<asset id="w3" type="g3d" class="monster" path="data/spider_run.g3d" scale_factor="20"/>
+	</artwork>
+	<level>
+	</level>
 </game>
