@@ -1,6 +1,7 @@
 <game>
 	<artwork>
 		<art id="w1" type="g3d" path="data/tunnel_back1.g3d" scale_factor="20"/>
+		<art id="w2" type="g3d" path="data/spider.g3d" scale_factor="20"/>
 	</artwork>
 	<levels>
 	</levels>
