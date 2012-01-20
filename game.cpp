@@ -32,6 +32,9 @@ private:
 	typedef std::map<std::string,model_t*> models_t;
 	models_t models;
 	model_t* active_model;
+	struct instance_t;
+	typedef std::vector<instance_t*> instances_t;
+	instances_t instances;
 	glm::vec2 pan_rate;
 	bool mouse_down;
 	float mouse_x, mouse_y;
@@ -49,10 +52,15 @@ struct main_game_t::model_t: public g3d_t, public g3d_t::loaded_t {
 	}
 };
 
+struct main_game_t::instance_t {
+	instance_t(model_t& m,const glm::vec3& pos): model(m), tx(glm::translate(pos)*m.tx) {}
+	model_t& model;
+	glm::mat4 tx;
+};
+
 void main_game_t::init() {
 	create_shaders(*this);
 	glClearColor(.4,.2,.6,1.);
-	glFrontFace(GL_CW); // we've got our y coords upside down
 	read_file("data/game.xml",this,LOAD_GAME_XML);
 }
 
@@ -72,6 +80,7 @@ void main_game_t::on_io(const std::string& name,bool ok,const std::string& bytes
 			if(models.find(id) != models.end())
 				data_error("dupicate art ID " << id);
 			if(type == "g3d") {
+				std::cout << "loading G3D " << path << std::endl;
 				models[id] = new model_t(*this,path,scaler);
 				if(!active_model) active_model = models[id];
 			} else
@@ -91,16 +100,16 @@ bool main_game_t::tick() {
 	screen_centre += pan_rate;
 	const glm::mat4 projection(glm::ortho<float>(
 		screen_centre.x-width/2,screen_centre.x+width/2,
-		screen_centre.y+height/2,screen_centre.y-height/2,
+		screen_centre.y-height/2,screen_centre.y+height/2, // y increases upwards
 		FLT_MIN,FLT_MAX));
-	const glm::mat4 modelview(glm::translate(glm::vec3(0,0,50)));
 	const glm::vec3 light0(10,10,10);
-	for(models_t::iterator m=models.begin(); m!=models.end(); m++)
-		m->second->draw(time,projection,modelview*m->second->tx,light0);
-	// show active model
+	// show all the instances
+	for(instances_t::iterator i=instances.begin(); i!=instances.end(); i++)
+		(*i)->model.draw(time,projection,(*i)->tx,light0);
+	// show active model on top for editing
 	if(active_model && mouse_down)
 		active_model->draw(time,projection,
-			glm::translate(glm::vec3(screen_centre.x+mouse_x-width/2,screen_centre.y+mouse_y-height/2,25))*active_model->tx,
+			glm::translate(glm::vec3(screen_centre.x+mouse_x-width/2,screen_centre.y-mouse_y+height/2,25))*active_model->tx,
 			light0,glm::vec4(1,0,.2,.4));
 	return true; // return false to exit program
 }
@@ -111,15 +120,16 @@ main_t* main_t::create(void* platform_ptr,int argc,char** args) {
 
 bool main_game_t::on_key_down(short code,const input_key_map_t& map,const input_mouse_map_t& mouse) {
 	switch(code) {
-	case KEY_LEFT: pan_rate.x = PAN_RATE; return true;
-	case KEY_RIGHT: pan_rate.x = -PAN_RATE; return true;
+	case KEY_LEFT: pan_rate.x = -PAN_RATE; return true;
+	case KEY_RIGHT: pan_rate.x = PAN_RATE; return true;
 	case KEY_UP: pan_rate.y = PAN_RATE; return true;
 	case KEY_DOWN: pan_rate.y = -PAN_RATE; return true;
 	case ' ': {
-			bool next = !active_model;
+			bool next = false;
 			for(models_t::iterator m=models.begin(); m!=models.end(); m++)
 				if(next) {
 					active_model = m->second;
+					next = false;
 					break;
 				} else
 					next = m->second == active_model;
@@ -151,5 +161,6 @@ bool main_game_t::on_mouse_down(int x,int y,mouse_button_t button,const input_ke
 
 bool main_game_t::on_mouse_up(int x,int y,mouse_button_t button,const input_key_map_t& map,const input_mouse_map_t& mouse) {
 	mouse_down = false;
+	instances.push_back(new instance_t(*active_model,glm::vec3(screen_centre.x+mouse_x-width/2,screen_centre.y-mouse_y+height/2,100)));
 	return true;
 }
