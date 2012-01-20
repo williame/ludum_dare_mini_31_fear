@@ -110,10 +110,12 @@ bool main_game_t::tick() {
 	for(instances_t::iterator i=instances.begin(); i!=instances.end(); i++)
 		(*i)->model.draw(time,projection,(*i)->tx,light0);
 	// show active model on top for editing
-	if(active_model && mouse_down)
+	if(active_model && mouse_down) {
+		std::cout << "drawing active " << active_model->filename << std::endl;
 		active_model->draw(time,projection,
 			glm::translate(glm::vec3(screen_centre.x+mouse_x-width/2,screen_centre.y-mouse_y+height/2,25))*active_model->tx,
 			light0,glm::vec4(1,0,.2,.4));
+	}
 	return true; // return false to exit program
 }
 
@@ -128,6 +130,7 @@ bool main_game_t::on_key_down(short code,const input_key_map_t& map,const input_
 	case KEY_UP: pan_rate.y = PAN_RATE; return true;
 	case KEY_DOWN: pan_rate.y = -PAN_RATE; return true;
 	case ' ': {
+			if(!models.size()) return false;
 			bool next = false;
 			for(models_t::iterator m=models.begin(); m!=models.end(); m++)
 				if(next) {
@@ -164,6 +167,10 @@ bool main_game_t::on_mouse_down(int x,int y,mouse_button_t button,const input_ke
 
 bool main_game_t::on_mouse_up(int x,int y,mouse_button_t button,const input_key_map_t& map,const input_mouse_map_t& mouse) {
 	mouse_down = false;
-	instances.push_back(new instance_t(*active_model,glm::vec3(screen_centre.x+mouse_x-width/2,screen_centre.y-mouse_y+height/2,100)));
+	if(active_model) {
+		std::cout << "creating new instance of " << active_model->filename << std::endl;
+		instances.push_back(new instance_t(*active_model,glm::vec3(screen_centre.x+mouse_x-width/2,screen_centre.y-mouse_y+height/2,100)));
+	} else
+		std::cout << "on_mouse_up without active_model" << std::endl;
 	return true;
 }
