@@ -59,7 +59,7 @@ private:
 	static const float PAN_RATE;
 };
 
-const float main_game_t::PAN_RATE = 10;
+const float main_game_t::PAN_RATE = 800; // px/sec
 
 struct main_game_t::artwork_t: public g3d_t, public g3d_t::loaded_t {
 	enum class_t {
@@ -380,10 +380,13 @@ void main_game_t::on_ready(artwork_t*) {
 }
 
 bool main_game_t::tick() {
-	static float time = 0.0;
-	time += 0.01;
-	if(time > 1.0) time -= 1.0;
-	screen_centre += pan_rate;
+	static uint64_t first_tick = now(), last_tick;
+	const uint64_t now = this->now();
+	const double elapsed = (double)(now-first_tick)/1000000000, // seconds
+		time = fmod(elapsed*.5,1), // cycle every 2 seconds
+		since_last = (double)(now-last_tick)/1000000000;
+	//std::cout << "elapsed=" << elapsed << ", since_last=" << since_last << std::endl;
+	screen_centre += pan_rate * glm::vec2(since_last,since_last);
 	const glm::mat4 projection(glm::ortho<float>(
 		screen_centre.x-width/2,screen_centre.x+width/2,
 		screen_centre.y-height/2,screen_centre.y+height/2, // y increases upwards
@@ -403,6 +406,8 @@ bool main_game_t::tick() {
 		floor->draw(projection,glm::vec4(1,0,0,1));
 	if(ceiling.get())
 		ceiling->draw(projection,glm::vec4(1,1,0,1));
+	// done
+	last_tick = now;
 	return true; // return false to exit program
 }
 
