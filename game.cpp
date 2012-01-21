@@ -93,6 +93,7 @@ struct main_game_t::object_t {
 	artwork_t& artwork;
 	glm::vec2 pos;
 	glm::mat4 tx;
+	void draw_selection(const glm::mat4& projection,const glm::vec4& colour);
 };
 
 void main_game_t::init() {
@@ -279,6 +280,17 @@ bool main_game_t::on_key_up(short code,const input_key_map_t& map,const input_mo
 	case 's': if(map.none()) save(); return true;
 	default:
 		switch(mode) {
+		case MODE_EDIT_OBJECT:
+			if(code == KEY_BACKSPACE) {
+				if(active_object) {
+					std::cout << "DELETING OBJECT " << active_object->artwork.path << std::endl;
+					objects.erase(std::find(objects.begin(),objects.end(),active_object));
+					delete active_object;
+					active_object = NULL;
+					return true;
+				}
+			}
+			return false;
 		case MODE_FLOOR:
 			return floor->on_key_up(code,map,mouse);
 		case MODE_CEILING:

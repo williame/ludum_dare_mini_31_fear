@@ -14,10 +14,12 @@
 		<asset id="m4" type="g3d" class="monster" path="data/Balrog/boss attack.G3D" scale_factor="50"/>
 	</artwork>
 	<level>
-		<object asset="b3" x="291" y="140"/>
-		<object asset="b6" x="-138" y="140"/>
 		<floor>
 			<node id="0" x="399" y="102"/>
+			<node id="1" x="-120" y="-38"/>
+			<node id="2" x="-218" y="-48"/>
+			<link a="1" b="0"/>
+			<link a="1" b="2"/>
 		</floor>
 		<ceiling>
 		</ceiling>
