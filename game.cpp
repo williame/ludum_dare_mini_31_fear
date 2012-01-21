@@ -194,7 +194,7 @@ bool main_game_t::tick() {
 	const glm::mat4 projection(glm::ortho<float>(
 		screen_centre.x-width/2,screen_centre.x+width/2,
 		screen_centre.y-height/2,screen_centre.y+height/2, // y increases upwards
-		1,200));
+		1,250));
 	const glm::vec3 light0(10,10,10);
 	// show all the objects
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
@@ -248,8 +248,11 @@ void main_game_t::save() {
 	xml << "<game>\n\t<artwork>\n";
 	for(artworks_t::iterator a=artwork.begin(); a!=artwork.end(); a++)
 		xml << "\t\t<asset id=\"" << a->first << "\" type=\"g3d\" class=\"" <<
-			(a->second->cls == artwork_t::CLS_BACK?"back":"monster") <<
-			"\" path=\"" << a->second->path << "\" scale_factor=\"" << a->second->scale_factor << "\"/>\n";
+			(a->second->cls == artwork_t::CLS_BACK?"back":
+			a->second->cls == artwork_t::CLS_PLAYER?"player":
+				"monster") <<
+			"\" path=\"" << a->second->path << "\" scale_factor=\"" << a->second->scale_factor << 
+			"\" speed=\"" << a->second->speed << "\"/>\n";
 	xml << "\t</artwork>\n\t<level>\n";
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
 		xml << "\t\t<object asset=\"" << (*i)->artwork.id << "\" x=\"" << (*i)->pos.x << "\" y=\"" << (*i)->pos.y << "\"/>\n"; 
