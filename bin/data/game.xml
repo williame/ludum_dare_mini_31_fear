@@ -12,6 +12,9 @@
 	</artwork>
 	<level>
 		<floor>
+			<node id="1" x="10" y="10"/>
+			<node id="2" x="100" y="30"/>
+			<link a="1" b="2"/>
 		</floor>
 		<ceiling>
 		</ceiling>

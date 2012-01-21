@@ -10,6 +10,7 @@
 #include "barebones/xml.hpp"
 #include "barebones/g3d.hpp"
 #include "external/ogl-math/glm/gtx/transform.hpp"
+#include "external/ogl-math/glm/gtx/closest_point.hpp"
 
 void create_shaders(main_t& main); // shaders.cpp
 
@@ -38,7 +39,8 @@ private:
 	};
 	enum {
 		MODE_LOAD,
-		MODE_PLACE_OBJECT,
+		MODE_OBJECT,
+		MODE_FLOOR,
 	} mode;
 	xml_parser_t game_xml;
 	glm::vec2 screen_centre;
@@ -84,7 +86,23 @@ struct main_game_t::object_t {
 	glm::mat4 tx;
 };
 
+static float distance(const glm::vec2& a,const glm::vec2& b) {
+	float dx = a.x - b.x, dy = a.y - b.y;
+	return sqrt(dx*dx+dy*dy);
+}
+
 struct main_game_t::path_t {
+	path_t(main_game_t& g): game(g), program(game.get_shared_program("path_t")),
+		dirty(true), id_seq(0), active_node(false) {
+		graphics_assert(program);
+		glGenBuffers(sizeof(vbo)/sizeof(*vbo),vbo);
+		uniform_mvp_matrix = game.get_uniform_loc(program,"MVP_MATRIX",GL_FLOAT_MAT4);
+		uniform_colour = game.get_uniform_loc(program,"COLOUR",GL_FLOAT_VEC4);
+		attrib_vertex = game.get_attribute_loc(program,"VERTEX",GL_FLOAT_VEC2);
+	}
+	main_game_t& game;
+	GLuint program, vbo[3], uniform_colour, uniform_mvp_matrix, attrib_vertex;
+	bool dirty;
 	struct link_t;
 	typedef std::vector<link_t*> links_t;
 	struct node_t {
@@ -94,16 +112,15 @@ struct main_game_t::path_t {
 		links_t links;
 	};
 	struct link_t {
-		link_t(const node_t* a_,const node_t* b_): a(a_), b(b_) {}
-		const node_t* const a;
-		const node_t* const b;
-		float distance() const {
-			float dx = a->pos.x - b->pos.x, dy = a->pos.y - b->pos.y;
-			return sqrt(dx*dx+dy*dy);
-		}
+		link_t(node_t* a_,node_t* b_): a(a_), b(b_) {}
+		node_t* a;
+		node_t* b;
+		float length() const { return ::distance(a->pos,b->pos); }
 	};
 	typedef std::vector<node_t*> nodes_t;
 	nodes_t nodes;
+	int id_seq;
+	node_t* active_node;
 	links_t links;
 	node_t* get_node(int id,bool null=false) {
 		for(nodes_t::iterator i=nodes.begin(); i!=nodes.end(); i++)
@@ -118,6 +135,7 @@ struct main_game_t::path_t {
 			if(get_node(id,true))
 				data_error("duplicate path node ID " << id);
 			nodes.push_back(new node_t(id,glm::vec2(x,y)));
+			id_seq = std::max(id_seq,id+1);
 		}
 		for(int i=0; xml.get_child("link",i); i++, xml.up()) {
 			node_t *a = get_node(xml.value_int("a")),
@@ -134,6 +152,107 @@ struct main_game_t::path_t {
 			xml << "\t\t\t<node id=\"" << (*i)->id << "\" x=\"" << (*i)->pos.x << "\" y=\"" << (*i)->pos.y << "\"/>\n";
 		for(links_t::const_iterator i=links.begin(); i!=links.end(); i++)
 			xml << "\t\t\t<link a=\"" << (*i)->a->id << "\" b=\"" << (*i)->b->id << "\"/>\n";
+	}
+	void draw(const glm::mat4& projection,const glm::vec4& colour) {
+		glUseProgram(program);
+		glUniform4fv(uniform_colour,1,glm::value_ptr(const_cast<glm::vec4&>(colour)));
+		glUniformMatrix4fv(uniform_mvp_matrix,1,false,glm::value_ptr(projection));
+		glEnableVertexAttribArray(attrib_vertex);
+		glCheck();
+		if(links.size()) {
+			glBindBuffer(GL_ARRAY_BUFFER,vbo[0]);
+			if(dirty) {
+				const size_t data_size = links.size()*4;
+				GLfloat* const data = new GLfloat[data_size], *p = data;
+				for(links_t::const_iterator l=links.begin(); l!=links.end(); l++) {
+					*p++ = (*l)->a->pos.x;
+					*p++ = (*l)->a->pos.y;
+					*p++ = (*l)->b->pos.x;
+					*p++ = (*l)->b->pos.y;
+				}
+				glBufferData(GL_ARRAY_BUFFER,data_size*sizeof(GLfloat),data,GL_STATIC_DRAW);
+				glCheck();
+				delete[] data;
+			}
+			glLineWidth(2.);
+			glVertexAttribPointer(attrib_vertex,2,GL_FLOAT,GL_FALSE,0,0);
+			glDrawArrays(GL_LINES,0,links.size()*2);
+			glCheck();
+		}
+		if(active_node) {
+			glBindBuffer(GL_ARRAY_BUFFER,vbo[2]);
+			GLfloat data[2] = {active_node->pos.x,active_node->pos.y};
+			glBufferData(GL_ARRAY_BUFFER,sizeof(data),data,GL_STATIC_DRAW);
+			glPointSize(6.);
+			glUniform4fv(uniform_colour,1,glm::value_ptr(glm::vec4(1,0,1,1)));
+			glVertexAttribPointer(attrib_vertex,2,GL_FLOAT,GL_FALSE,0,0);
+			glDrawArrays(GL_POINTS,0,1);
+			glUniform4fv(uniform_colour,1,glm::value_ptr(const_cast<glm::vec4&>(colour)));
+			glCheck();	
+		}
+		if(nodes.size()) {
+			glBindBuffer(GL_ARRAY_BUFFER,vbo[1]);
+			if(dirty) {
+				const size_t data_size = nodes.size()*2;
+				GLfloat* const data = new GLfloat[data_size], *p = data;
+				for(nodes_t::const_iterator n=nodes.begin(); n!=nodes.end(); n++) {
+					*p++ = (*n)->pos.x;
+					*p++ = (*n)->pos.y;
+				}
+				glBufferData(GL_ARRAY_BUFFER,data_size*sizeof(GLfloat),data,GL_STATIC_DRAW);
+				glCheck();
+				delete[] data;
+			}
+			glPointSize(4.);
+			glVertexAttribPointer(attrib_vertex,2,GL_FLOAT,GL_FALSE,0,0);
+			glDrawArrays(GL_POINTS,0,nodes.size());
+			glCheck();
+		}
+		dirty = false;
+	}
+	node_t* nearest(const glm::vec2& p,float threshold = 4) {
+		node_t* nearest = NULL;
+		for(nodes_t::iterator n=nodes.begin(); n!=nodes.end(); n++) {
+			const float d = distance(p,(*n)->pos);
+			if(d<threshold) {
+				nearest = *n;
+				threshold = d;
+			}
+		}
+		return nearest;
+	}
+	link_t* nearest_link(const glm::vec2& p,float threshold = 4) {
+		link_t* nearest = NULL;
+		for(links_t::iterator l=links.begin(); l!=links.end(); l++) {
+			const glm::vec3 n = glm::closestPointOnLine(glm::vec3(p,0),glm::vec3((*l)->a->pos,0),glm::vec3((*l)->b->pos,0));
+			const float d = distance(p,glm::vec2(n.x,n.y));
+			if(d<threshold) {
+				nearest = *l;
+				threshold = d;
+			}
+		}
+		return nearest;
+	}
+	void on_mouse_down(int x,int y,mouse_button_t button,const input_key_map_t& map,const input_mouse_map_t& mouse) {
+		const glm::vec2 pos(x,y);
+		active_node = nearest(pos);
+		if(!active_node) {
+			if(link_t* link = nearest_link(pos)) {
+				active_node = new node_t(id_seq++,pos);
+				nodes.push_back(active_node);
+				active_node->links.push_back(link);
+				node_t* b = link->b;
+				b->links.erase(std::find(b->links.begin(),b->links.end(),link));
+				link->b = active_node;
+				link = new link_t(active_node,b);
+				links.push_back(link);
+				active_node->links.push_back(link);
+				b->links.push_back(link);
+				dirty = true;
+			}
+		}
+	}
+	void on_mouse_up(int x,int y,mouse_button_t button,const input_key_map_t& map,const input_mouse_map_t& mouse) {
 	}
 };
 
@@ -186,7 +305,7 @@ void main_game_t::on_io(const std::string& name,bool ok,const std::string& bytes
 void main_game_t::on_ready(artwork_t*) {
 	if(is_ready()) {
 		std::cout << "artwork all loaded" << std::endl;
-		mode = MODE_PLACE_OBJECT;
+		mode = MODE_OBJECT;
 		xml_walker_t xml(game_xml.walker());
 		xml.check("game").get_child("level");
 		for(int i=0; xml.get_child("object",i); i++, xml.up()) {
@@ -197,10 +316,10 @@ void main_game_t::on_ready(artwork_t*) {
 			objects.push_back(new object_t(*artwork[asset],glm::vec2(x,y)));
 		}
 		xml.get_child("floor");
-		floor.reset(new path_t());
+		floor.reset(new path_t(*this));
 		floor->load(xml);
 		xml.up().get_child("ceiling");
-		ceiling.reset(new path_t());
+		ceiling.reset(new path_t(*this));
 		ceiling->load(xml);
 		xml.up();
 		glClearColor(1,1,1,1);
@@ -221,11 +340,16 @@ bool main_game_t::tick() {
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
 		(*i)->artwork.draw(time,projection,(*i)->tx,light0);
 	// show active model on top for editing
-	if((mode == MODE_PLACE_OBJECT) && active_model && mouse_down) {
+	if((mode == MODE_OBJECT) && active_model && mouse_down) {
 		active_model->draw(time,projection,
 			glm::translate(glm::vec3(screen_centre.x+mouse_x-width/2,screen_centre.y-mouse_y+height/2,-20))*active_model->tx,
 			light0,glm::vec4(1,.6,.6,.6));
 	}
+	// floor and ceiling
+	if(floor.get())
+		floor->draw(projection,glm::vec4(1,0,0,1));
+	if(ceiling.get())
+		ceiling->draw(projection,glm::vec4(1,1,0,1));
 	return true; // return false to exit program
 }
 
@@ -265,6 +389,8 @@ bool main_game_t::on_key_down(short code,const input_key_map_t& map,const input_
 	case KEY_RIGHT: pan_rate.x = PAN_RATE; return true;
 	case KEY_UP: pan_rate.y = PAN_RATE; return true;
 	case KEY_DOWN: pan_rate.y = -PAN_RATE; return true;
+	case 'o': mode = MODE_OBJECT; return true;
+	case 'f': mode = MODE_FLOOR; return true;
 	case ' ': {
 			if(!artwork.size()) return false;
 			bool next = false;
@@ -299,17 +425,32 @@ bool main_game_t::on_mouse_down(int x,int y,mouse_button_t button,const input_ke
 	mouse_down = true;
 	mouse_x = x;
 	mouse_y = y;
+	const int mapped_x = screen_centre.x+mouse_x-width/2, mapped_y = screen_centre.y-mouse_y+height/2;
+	if(mode == MODE_FLOOR)
+		floor->on_mouse_down(mapped_x,mapped_y,button,map,mouse);
 	return true;
 }
 
 bool main_game_t::on_mouse_up(int x,int y,mouse_button_t button,const input_key_map_t& map,const input_mouse_map_t& mouse) {
 	mouse_down = false;
-	if(active_model) {
-		std::cout << "creating new object of " << active_model->filename << std::endl;
-		const glm::vec2 pos(screen_centre.x+mouse_x-width/2,screen_centre.y-mouse_y+height/2);
-		objects.push_back(new object_t(*active_model,pos));
-	} else
-		std::cout << "on_mouse_up without active_model" << std::endl;
+	mouse_x = x;
+	mouse_y = y;
+	const int mapped_x = screen_centre.x+mouse_x-width/2, mapped_y = screen_centre.y-mouse_y+height/2;
+	switch(mode) {
+	case MODE_LOAD:
+		break;
+	case MODE_FLOOR:
+		floor->on_mouse_up(mapped_x,mapped_y,button,map,mouse);
+		break;
+	case MODE_OBJECT:
+		if(active_model) {
+			std::cout << "creating new object of " << active_model->filename << std::endl;
+			const glm::vec2 pos(mapped_x,mapped_y);
+			objects.push_back(new object_t(*active_model,pos));
+		} else
+			std::cout << "on_mouse_up without active_model" << std::endl;
+		break;
+	}
 	return true;
 }
 

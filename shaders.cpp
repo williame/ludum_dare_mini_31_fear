@@ -51,5 +51,15 @@ void create_shaders(main_t& main) {
 		"	float intensity = min(max(dot(LIGHT_0,normal),.4)*.8,1.);\n"
 		"	gl_FragColor = vec4(COLOUR.rgb * texel * intensity,COLOUR.a);\n"
 		"}\n"));
+	main.set_shared_program("path_t",main.create_program(
+			"uniform mat4 MVP_MATRIX;\n"
+			"attribute vec2 VERTEX;\n"
+			"void main() {\n"
+			"	gl_Position = MVP_MATRIX * vec4(VERTEX,-2.,1.);\n"
+			"}\n",
+			"uniform vec4 COLOUR;\n"
+			"void main() {\n"
+			"	gl_FragColor = COLOUR;\n"
+			"}\n"));
 }
 
