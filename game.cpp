@@ -73,17 +73,17 @@ struct main_game_t::artwork_t: public g3d_t, public g3d_t::loaded_t {
 		CLS_MONSTER = 90,
 		CLS_PLAYER = 89,
 	};
-	artwork_t(main_game_t& main,const std::string& id_,const std::string& p,class_t c,float sf,float sp,const glm::vec3& a):
+	artwork_t(main_game_t& main,const std::string& id_,const std::string& p,class_t c,float sf,float sp,const glm::vec3& a,float al):
 		g3d_t(main,p,this), game(main), id(id_), path(p), cls(c),
 		tx(glm::scale(glm::vec3(sf,sf,sf))),
 		anchor(glm::scale(glm::vec3(sf,sf,sf))*glm::vec4(a,1)),
-		scale_factor(sf), speed(sp) {}
+		scale_factor(sf), speed(sp), animation_length(al) {}
 	main_game_t& game;
 	const std::string id, path;
 	class_t cls;
 	const glm::mat4 tx;
 	const glm::vec4 anchor;
-	const float scale_factor, speed;
+	const float scale_factor, speed, animation_length;
 	void on_g3d_loaded(g3d_t& g3d,bool ok,intptr_t data) {
 		if(!ok) data_error("failed to load " << filename);
 		game.on_ready(this);
@@ -142,6 +142,7 @@ void main_game_t::on_io(const std::string& name,bool ok,const std::string& bytes
 				path = xml.value_string("path");
 			const float scaler = xml.has_key("scale_factor")? xml.value_float("scale_factor"):1.0;
 			const float speed = xml.has_key("speed")? xml.value_float("speed"):0;
+			const float animation_length = xml.has_key("animation_length")? xml.value_float("animation_length"): 0;
 			const glm::vec3 anchor(
 				xml.has_key("anchor_x")? xml.value_float("anchor_x"):0,
 				xml.has_key("anchor_y")? xml.value_float("anchor_y"):0,
@@ -155,7 +156,7 @@ void main_game_t::on_io(const std::string& name,bool ok,const std::string& bytes
 				data_error("dupicate asset ID " << id);
 			if(type == "g3d") {
 				std::cout << "loading G3D " << path << std::endl;
-				artwork[id] = new artwork_t(*this,id,path,cls,scaler,speed,anchor);
+				artwork[id] = new artwork_t(*this,id,path,cls,scaler,speed,anchor,animation_length);
 				if(!active_model) active_model = artwork[id];
 			} else
 				data_error("unsupported artwork type "<<type);
@@ -218,12 +219,12 @@ bool main_game_t::tick() {
 					active_model->tx,
 				light0,glm::vec4(1,.6,.6,.6));
 		}
-		// floor and ceiling
-		if(floor.get())
-			floor->draw(projection,glm::vec4(1,0,0,1));
-		if(ceiling.get())
-			ceiling->draw(projection,glm::vec4(1,1,0,1));
 	}
+	// floor and ceiling ## hide for production	
+	if(floor.get())
+		floor->draw(projection,glm::vec4(1,0,0,1));
+	if(ceiling.get())
+		ceiling->draw(projection,glm::vec4(1,1,0,1));
 	// done
 	last_tick = now;
 	return true; // return false to exit program
@@ -254,6 +255,7 @@ void main_game_t::play_tick(float step) {
 	} else {
 		std::cerr << "LEVEL ERROR: player falls off world!" << std::endl;
 		mode = MODE_FLOOR;
+		glClearColor(1,1,1,1);
 		return;
 	}
 	player->pos += move;
@@ -267,13 +269,24 @@ void main_game_t::save() {
 	std::cout << "saving..." << std::endl;
 	std::stringstream xml(std::ios_base::out|std::ios_base::ate);
 	xml << "<game>\n\t<artwork>\n";
-	for(artworks_t::iterator a=artwork.begin(); a!=artwork.end(); a++)
+	for(artworks_t::iterator a=artwork.begin(); a!=artwork.end(); a++) {
 		xml << "\t\t<asset id=\"" << a->first << "\" type=\"g3d\" class=\"" <<
 			(a->second->cls == artwork_t::CLS_BACK?"back":
 			a->second->cls == artwork_t::CLS_PLAYER?"player":
 				"monster") <<
-			"\" path=\"" << a->second->path << "\" scale_factor=\"" << a->second->scale_factor << 
-			"\" speed=\"" << a->second->speed << "\"/>\n";
+			"\" path=\"" << a->second->path << "\" scale_factor=\"" << a->second->scale_factor << "\"";
+		if(a->second->speed > 0)
+			xml << " speed=\"" << a->second->speed << "\"";
+		if(a->second->anchor.x != 0)
+			xml << " anchor_x=\"" << a->second->anchor.x << "\"";
+		if(a->second->anchor.y != 0)
+			xml << " anchor_y=\"" << a->second->anchor.y << "\"";
+		if(a->second->anchor.z != 0)
+			xml << " anchor_z=\"" << a->second->anchor.z << "\"";
+		if(a->second->animation_length > 0)
+			xml << " animation_length=\"" << a->second->animation_length << "\"";
+		xml << "/>\n";
+	}
 	xml << "\t</artwork>\n\t<level>\n";
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
 		xml << "\t\t<object asset=\"" << (*i)->artwork.id << "\" x=\"" << (*i)->pos.x << "\" y=\"" << (*i)->pos.y << "\"/>\n"; 

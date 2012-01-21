@@ -21,8 +21,8 @@ path_t::path_t(main_t& m): main(m), program(m.get_shared_program("path_t")),
 }
 
 bool path_t::y_at(const glm::vec2& p,float& y,bool down) const {
+	assert(down);
 	bool found = false;
-	glm::vec2 best;
 	for(links_t::const_iterator l=links.begin(); l!=links.end(); l++) {
 		const node_t* a = (*l)->a, *b = (*l)->b;
 		if(a->pos.x > b->pos.x) std::swap(a,b);
@@ -31,11 +31,10 @@ bool path_t::y_at(const glm::vec2& p,float& y,bool down) const {
 			const float mu = fabsf(p.x-a->pos.x)<1?0:
 				fabsf(p.x-b->pos.x)<1?1:
 				(p.x-a->pos.x)/(b->pos.x-a->pos.x);
-			const glm::vec2 pos(p.x,a->pos.y*(1-mu)+b->pos.y*mu);
-			if(found && (distance(p,best) < distance(pos,best)))
+			const float pos_y = a->pos.y*(1-mu)+b->pos.y*mu;
+			if(found && (fabs(p.y-y) < fabs(p.y-pos_y)))
 				continue;
-			best = pos;
-			y = pos.y;
+			y = pos_y;
 			found = true;
 		}
 	}
