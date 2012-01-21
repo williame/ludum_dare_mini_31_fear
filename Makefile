@@ -3,7 +3,7 @@
 ifeq ($(shell uname),MINGW32_NT-6.1) # mingw
 	EXE_EXT =.exe
 	SDL_CFLAGS =-I/usr/include `sdl-config --cflags`
-	SDL_LDFLAGS =-L/usr/lib `sdl-config --static-libs` -static-libgcc -static-libstdc++ -Lbin -lglew32s -lopengl32
+	SDL_LDFLAGS =-L/usr/lib `sdl-config --static-libs` -static-libgcc -static-libstdc++ -lopengl32
 else
 	EXE_EXT =
 	SDL_CFLAGS =`pkg-config --cflags sdl gl glew`
@@ -17,7 +17,7 @@ NACL_LDFLAGS = -lppapi -lppapi_cpp -lppapi_gles2
 
 # generic flags
 
-CFLAGS = -g3 -Wall -O0 #-pedantic-errors -std=c++98 -Wno-long-long -fdiagnostics-show-option
+CFLAGS = -g3 -Wall -O0 -DGLEW_STATIC #-pedantic-errors -std=c++98 -Wno-long-long -fdiagnostics-show-option
 # -O9 -fomit-frame-pointer -march=native # etc -fprofile-generate/-fprofile-use
 
 BUILD_TIMESTAMP = $(shell date +%y%m%d-%H%M%S)
@@ -32,7 +32,7 @@ OBJ_BASE_CPP = \
 	barebones/xml.opp \
 	barebones/g3d.opp \
 	barebones/build_info.opp \
-	barebones/main.opp
+	barebones/main.opp \
 
 OBJ_SDL_CPP = $(OBJ_BASE_CPP:%.opp=%.sdl.opp)
 
@@ -47,7 +47,8 @@ OBJ_BASE_C = \
 	external/SOIL/SOIL.o \
 	external/SOIL/image_helper.o \
 	external/SOIL/stb_image_aug.o \
-	external/SOIL/image_DXT.o
+	external/SOIL/image_DXT.o \
+	external/glew/glew.o
 
 OBJ_SDL_C = $(OBJ_BASE_C:%.o=%.sdl.o)
 
