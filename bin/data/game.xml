@@ -1,6 +1,8 @@
 <game>
 	<artwork>
 		<asset id="b1" type="g3d" class="back" path="data/tunnel_back1.g3d" scale_factor="30"/>
+		<asset id="b10" type="g3d" class="back" path="data/tunnel_back_fork1_closed.g3d" scale_factor="30"/>
+		<asset id="b11" type="g3d" class="back" path="data/tunnel_back_fork1_open.g3d" scale_factor="30"/>
 		<asset id="b2" type="g3d" class="back" path="data/tunnel_back2.g3d" scale_factor="30"/>
 		<asset id="b3" type="g3d" class="back" path="data/tunnel_back3.g3d" scale_factor="30"/>
 		<asset id="b4" type="g3d" class="back" path="data/tunnel_back4.g3d" scale_factor="30"/>
@@ -9,8 +11,6 @@
 		<asset id="b7" type="g3d" class="back" path="data/tunnel_portcullis_closed.g3d" scale_factor="30"/>
 		<asset id="b8" type="g3d" class="back" path="data/tunnel_portcullis_open.g3d" scale_factor="30"/>
 		<asset id="b9" type="g3d" class="back" path="data/tunnel_updown.g3d" scale_factor="30"/>
-		<asset id="b10" type="g3d" class="back" path="data/tunnel_back_fork1_closed.g3d" scale_factor="30"/>
-		<asset id="b11" type="g3d" class="back" path="data/tunnel_back_fork1_open.g3d" scale_factor="30"/>
 		<asset id="g1" type="g3d" class="monster" path="data/Girl/girl_no_animation.G3D" scale_factor="50"/>
 		<asset id="m1" type="g3d" class="monster" path="data/spider1.g3d" scale_factor="30"/>
 		<asset id="m2" type="g3d" class="monster" path="data/spider_run.g3d" scale_factor="30"/>
@@ -18,6 +18,16 @@
 		<asset id="m4" type="g3d" class="monster" path="data/Balrog/boss attack.G3D" scale_factor="50"/>
 	</artwork>
 	<level>
+		<object asset="b2" x="-475" y="17"/>
+		<object asset="b5" x="-42" y="18"/>
+		<object asset="b8" x="394" y="18"/>
+		<object asset="b9" x="1041" y="18"/>
+		<object asset="b10" x="1214" y="351"/>
+		<object asset="b2" x="1647" y="350"/>
+		<object asset="b3" x="1622" y="77"/>
+		<object asset="b5" x="1633" y="-173"/>
+		<object asset="m4" x="-482" y="-81"/>
+		<object asset="g1" x="31" y="-79"/>
 		<floor>
 		</floor>
 		<ceiling>
