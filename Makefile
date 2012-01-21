@@ -3,7 +3,7 @@
 ifeq ($(shell uname),MINGW32_NT-6.1) # mingw
 	EXE_EXT =.exe
 	SDL_CFLAGS =-I/usr/include `sdl-config --cflags`
-	SDL_LDFLAGS =-L/usr/lib `sdl-config --static-libs` -static-libgcc -static-libstdc++ -lopengl32 -lglew32
+	SDL_LDFLAGS =-L/usr/lib `sdl-config --static-libs` -static-libgcc -static-libstdc++ -Lbin -lglew32s -lopengl32
 else
 	EXE_EXT =
 	SDL_CFLAGS =`pkg-config --cflags sdl gl glew`
