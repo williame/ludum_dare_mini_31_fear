@@ -28,6 +28,7 @@ CFLAGS += -DBUILD_TIMESTAMP=\"$(BUILD_TIMESTAMP)\" -DGIT_INFO=\"$(shell git symb
 OBJ_BASE_CPP = \
 	game.opp \
 	shaders.opp \
+	paths.opp \
 	barebones/xml.opp \
 	barebones/g3d.opp \
 	barebones/build_info.opp \

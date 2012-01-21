@@ -10,6 +10,7 @@
 		<asset id="m1" type="g3d" class="monster" path="data/spider1.g3d" scale_factor="30"/>
 		<asset id="m2" type="g3d" class="monster" path="data/spider_run.g3d" scale_factor="30"/>
 		<asset id="m3" type="g3d" class="monster" path="data/Balrog/boss walk.G3D" scale_factor="50"/>
+		<asset id="m4" type="g3d" class="monster" path="data/Balrog/boss attack.G3D" scale_factor="50"/>
 		<asset id="g1" type="g3d" class="monster" path="data/Girl/girl_no_animation.G3D" scale_factor="50"/>
 	</artwork>
 	<level>
