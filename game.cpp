@@ -60,15 +60,10 @@ private:
 	object_t* active_object;
 	glm::vec2 pan_rate, active_object_anchor;
 	object_t* player;
-	float player_dir;
 	bool mouse_down;
 	float mouse_x, mouse_y;
 	static const float PAN_RATE;
 };
-
-static const glm::mat4
-	ROT_LEFT(glm::rotate(90.0f,glm::vec3(0,1,0))),
-	ROT_RIGHT(glm::rotate(270.0f,glm::vec3(0,1,0)));
 
 const float main_game_t::PAN_RATE = 800; // px/sec
 
@@ -97,10 +92,22 @@ struct main_game_t::artwork_t: public g3d_t, public g3d_t::loaded_t {
 
 struct main_game_t::object_t {
 	object_t(artwork_t& a,const glm::vec2& p):
-		artwork(a), pos(p), tx(glm::translate(glm::vec3(p,-a.cls))*a.tx) {}
+		artwork(a), pos(p), dir(IDLE) {}
 	artwork_t& artwork;
 	glm::vec2 pos;
-	glm::mat4 tx;
+	enum {
+		LEFT = -1,
+		IDLE = 0,
+		RIGHT = 1
+	} dir;
+	glm::mat4 tx() {
+		glm::mat4 tx(glm::translate(glm::vec3(pos,-artwork.cls))*artwork.tx);
+		if(dir == LEFT)
+			tx *= glm::rotate(270.0f,glm::vec3(0,1,0));
+		else if(dir == RIGHT)
+			tx *= glm::rotate(90.0f,glm::vec3(0,1,0));
+		return tx;
+	}
 	void draw_selection(const glm::mat4& projection,const glm::vec4& colour);
 };
 
@@ -194,16 +201,17 @@ bool main_game_t::tick() {
 	const glm::mat4 projection(glm::ortho<float>(
 		screen_centre.x-width/2,screen_centre.x+width/2,
 		screen_centre.y-height/2,screen_centre.y+height/2, // y increases upwards
-		1,250));
+		1,300));
 	const glm::vec3 light0(10,10,10);
 	// show all the objects
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
-		(*i)->artwork.draw(time,projection,(*i)->tx,light0);
+		(*i)->artwork.draw(time,projection,(*i)->tx(),light0);
 	if(mode != MODE_PLAY) {
 		// show active model on top for editing
 		if((mode == MODE_PLACE_OBJECT) && active_model && mouse_down) {
 			active_model->draw(time,projection,
-				glm::translate(glm::vec3(screen_centre.x+mouse_x-width/2,screen_centre.y-mouse_y+height/2,-50))*active_model->tx,
+				glm::translate(glm::vec3(screen_centre.x+mouse_x-width/2,screen_centre.y-mouse_y+height/2,-50))*
+					active_model->tx,
 				light0,glm::vec4(1,.6,.6,.6));
 		}
 		// floor and ceiling
@@ -219,12 +227,11 @@ bool main_game_t::tick() {
 
 void main_game_t::play_tick(float step) {
 	// move main player
-	glm::vec2 move(player->artwork.speed * step * player_dir,0),
+	glm::vec2 move(player->artwork.speed * step * player->dir,0),
 		player_pos(glm::vec2(player->artwork.anchor.x,player->artwork.anchor.y)+player->pos);
 	float floor_y;
 	if(floor->y_at(player_pos,floor_y,true)) {
 		floor_y -= player_pos.y;
-		std::cout << "player " << player_pos.x << ',' << player_pos.y << ", floor " << floor_y << std::endl;
 		if(floor_y > player_pos.y)
 			move.y = floor_y;
 		else if(floor_y < player_pos.y)
@@ -235,7 +242,6 @@ void main_game_t::play_tick(float step) {
 		return;
 	}
 	player->pos += move;
-	player->tx = glm::translate(glm::vec3(move,0)) * player->tx;
 }
 
 void main_game_t::save() {
@@ -293,7 +299,7 @@ void main_game_t::play() {
 	}
 	mode = MODE_PLAY;
 	pan_rate = glm::vec2(0,0);
-	player_dir = 0;
+	glClearColor(0,0,0,1);
 	std::cout << "Playing game!" << std::endl;
 }
 
@@ -301,10 +307,10 @@ bool main_game_t::on_key_down(short code,const input_key_map_t& map,const input_
 	if(mode == MODE_PLAY) {
 		switch(code) {
 		case KEY_LEFT:
-			player_dir = -1;
+			player->dir = object_t::LEFT;
 			break;
 		case KEY_RIGHT:
-			player_dir = 1;
+			player->dir = object_t::RIGHT;
 			break;
 		default:;
 		}
@@ -360,7 +366,7 @@ bool main_game_t::on_key_up(short code,const input_key_map_t& map,const input_mo
 		switch(code) {
 		case KEY_LEFT:
 		case KEY_RIGHT:
-			player_dir = 0;
+			player->dir = object_t::IDLE;
 			break;
 		default:;
 		}
@@ -406,7 +412,6 @@ bool main_game_t::on_mouse_down(int x,int y,mouse_button_t button,const input_ke
 				const glm::vec2 pos(mapped_x,mapped_y),
 					ofs(pos-active_object_anchor);
 				active_object->pos += ofs;
-				active_object->tx = glm::translate(glm::vec3(ofs,0)) * active_object->tx;
 				active_object_anchor = pos;
 			}
 		} else {
@@ -415,8 +420,9 @@ bool main_game_t::on_mouse_down(int x,int y,mouse_button_t button,const input_ke
 			for(objects_t::iterator o=objects.begin(); o!=objects.end(); o++) {
 				glm::vec3 bl1, tr1;
 				(*o)->artwork.bounds(bl1,tr1);
-				const glm::vec4 bl = (*o)->tx * glm::vec4(bl1,1);
-				const glm::vec4 tr = (*o)->tx * glm::vec4(tr1,1);
+				const glm::mat4 tx = (*o)->tx();
+				const glm::vec4 bl = tx * glm::vec4(bl1,1);
+				const glm::vec4 tr = tx * glm::vec4(tr1,1);
 				if((pos.x>=bl.x) &&
 					(pos.y>=bl.y) &&
 					(pos.x<tr.x) &&
