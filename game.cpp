@@ -1,5 +1,6 @@
 #include <iostream>
 #include <map>
+#include <memory>
 
 #ifndef __native_client__
 	#include <fstream>
@@ -44,6 +45,8 @@ private:
 	typedef std::map<std::string,artwork_t*> artworks_t;
 	artworks_t artwork;
 	artwork_t* active_model;
+	struct path_t;
+	std::auto_ptr<path_t> floor, ceiling;
 	struct object_t;
 	typedef std::vector<object_t*> objects_t;
 	objects_t objects;
@@ -79,6 +82,59 @@ struct main_game_t::object_t {
 	artwork_t& artwork;
 	glm::vec2 pos;
 	glm::mat4 tx;
+};
+
+struct main_game_t::path_t {
+	struct link_t;
+	typedef std::vector<link_t*> links_t;
+	struct node_t {
+		node_t(int id_,const glm::vec2& p): id(id_), pos(p) {}
+		const int id;
+		const glm::vec2 pos;
+		links_t links;
+	};
+	struct link_t {
+		link_t(const node_t* a_,const node_t* b_): a(a_), b(b_) {}
+		const node_t* const a;
+		const node_t* const b;
+		float distance() const {
+			float dx = a->pos.x - b->pos.x, dy = a->pos.y - b->pos.y;
+			return sqrt(dx*dx+dy*dy);
+		}
+	};
+	typedef std::vector<node_t*> nodes_t;
+	nodes_t nodes;
+	links_t links;
+	node_t* get_node(int id,bool null=false) {
+		for(nodes_t::iterator i=nodes.begin(); i!=nodes.end(); i++)
+			if((*i)->id == id) return *i;
+		if(null) return NULL;
+		data_error("could not resolve path node ID " << id);
+	}
+	void load(xml_walker_t& xml) {
+		for(int i=0; xml.get_child("node",i); i++, xml.up()) {
+			const int id = xml.value_int("id");
+			const float x = xml.value_float("x"), y = xml.value_float("y");
+			if(get_node(id,true))
+				data_error("duplicate path node ID " << id);
+			nodes.push_back(new node_t(id,glm::vec2(x,y)));
+		}
+		for(int i=0; xml.get_child("link",i); i++, xml.up()) {
+			node_t *a = get_node(xml.value_int("a")),
+				*b = get_node(xml.value_int("b"));
+			link_t* link = new link_t(a,b);
+			links.push_back(link);
+			a->links.push_back(link);
+			b->links.push_back(link);
+
+		}
+	}
+	void save(std::stringstream& xml) const {
+		for(nodes_t::const_iterator i=nodes.begin(); i!=nodes.end(); i++)
+			xml << "\t\t\t<node id=\"" << (*i)->id << "\" x=\"" << (*i)->pos.x << "\" y=\"" << (*i)->pos.y << "\"/>\n";
+		for(links_t::const_iterator i=links.begin(); i!=links.end(); i++)
+			xml << "\t\t\t<link a=\"" << (*i)->a->id << "\" b=\"" << (*i)->b->id << "\"/>\n";
+	}
 };
 
 void main_game_t::init() {
@@ -140,6 +196,12 @@ void main_game_t::on_ready(artwork_t*) {
 				data_error("unresolved asset ID " << asset);
 			objects.push_back(new object_t(*artwork[asset],glm::vec2(x,y)));
 		}
+		xml.get_child("floor");
+		floor.reset(new path_t());
+		floor->load(xml);
+		xml.up().get_child("ceiling");
+		ceiling.reset(new path_t());
+		ceiling->load(xml);
 		xml.up();
 	}
 }

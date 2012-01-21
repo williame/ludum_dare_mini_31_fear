@@ -5,5 +5,12 @@
 		<asset id="w3" type="g3d" class="monster" path="data/spider_run.g3d" scale_factor="20"/>
 	</artwork>
 	<level>
+		<object asset="w1" x="-116" y="74"/>
+		<object asset="w1" x="172" y="70"/>
+		<object asset="w3" x="3" y="16"/>
+		<object asset="w3" x="143" y="15"/>
+		<object asset="w3" x="244" y="13"/>
+		<floor/>
+		<ceiling/>
 	</level>
 </game>
