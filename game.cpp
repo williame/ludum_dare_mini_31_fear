@@ -99,12 +99,12 @@ struct main_game_t::object_t {
 		LEFT = -1,
 		IDLE = 0,
 		RIGHT = 1
-	} dir;
+	} dir, jump_dir;
 	enum {
 		WALKING,
 		JUMPING,
 	} state;
-	double jump_gravity;
+	double jump_gravity, jump_energy;
 	glm::mat4 tx() {
 		glm::mat4 tx(glm::translate(glm::vec3(pos,-artwork.cls))*artwork.tx);
 		if(dir == LEFT)
@@ -231,13 +231,13 @@ bool main_game_t::tick() {
 
 void main_game_t::play_tick(float step) {
 	// move main player
-	glm::vec2 move(player->artwork.speed * step * player->dir,0),
+	glm::vec2 move(player->artwork.speed * step * (player->state==object_t::JUMPING?player->jump_dir:player->dir),0),
 		player_pos(glm::vec2(player->artwork.anchor.x,player->artwork.anchor.y)+player->pos);
 	float floor_y;
 	if(floor->y_at(player_pos,floor_y,true)) {
 		if(player->state == object_t::JUMPING) {
 			player->jump_gravity += 4.0*step;
-			const double jump_up = 200.0*step - player->jump_gravity;
+			const double jump_up = player->jump_energy*step - player->jump_gravity;
 			if(jump_up+player_pos.y < floor_y) {
 				move.y = floor_y-player_pos.y;
 				player->state = object_t::WALKING;
@@ -324,18 +324,16 @@ bool main_game_t::on_key_down(short code,const input_key_map_t& map,const input_
 		case KEY_UP:
 			if(player->state == object_t::WALKING) {
 				player->jump_gravity = 0;
+				player->jump_energy = 200;
+				player->jump_dir = player->dir;
 				player->state = object_t::JUMPING;
 			}
 			break;
 		case KEY_LEFT:
-			if(player->state == object_t::WALKING) {
-				player->dir = object_t::LEFT;
-			}
+			player->dir = object_t::LEFT;
 			break;
 		case KEY_RIGHT:
-			if(player->state == object_t::WALKING) {
-				player->dir = object_t::RIGHT;
-			}
+			player->dir = object_t::RIGHT;
 			break;
 		default:;
 		}
@@ -389,6 +387,9 @@ bool main_game_t::on_key_down(short code,const input_key_map_t& map,const input_
 bool main_game_t::on_key_up(short code,const input_key_map_t& map,const input_mouse_map_t& mouse) {
 	if(mode == MODE_PLAY) {
 		switch(code) {
+		case KEY_UP:
+			player->jump_energy *= 0.7; // stop them jumping full-apogee
+			break;
 		case KEY_LEFT:
 		case KEY_RIGHT:
 			player->dir = object_t::IDLE;
