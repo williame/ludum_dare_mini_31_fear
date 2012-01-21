@@ -7,14 +7,17 @@
 		<asset id="b5" type="g3d" class="back" path="data/tunnel_back5.g3d" scale_factor="30"/>
 		<asset id="b6" type="g3d" class="back" path="data/tunnel_back_fork1_closed.g3d" scale_factor="30"/>
 		<asset id="b7" type="g3d" class="back" path="data/tunnel_back_fork1_open.g3d" scale_factor="30"/>
+		<asset id="g1" type="g3d" class="monster" path="data/Girl/girl_no_animation.G3D" scale_factor="50"/>
 		<asset id="m1" type="g3d" class="monster" path="data/spider1.g3d" scale_factor="30"/>
 		<asset id="m2" type="g3d" class="monster" path="data/spider_run.g3d" scale_factor="30"/>
 		<asset id="m3" type="g3d" class="monster" path="data/Balrog/boss walk.G3D" scale_factor="50"/>
 		<asset id="m4" type="g3d" class="monster" path="data/Balrog/boss attack.G3D" scale_factor="50"/>
-		<asset id="g1" type="g3d" class="monster" path="data/Girl/girl_no_animation.G3D" scale_factor="50"/>
 	</artwork>
 	<level>
+		<object asset="b3" x="291" y="140"/>
+		<object asset="b6" x="-138" y="140"/>
 		<floor>
+			<node id="0" x="399" y="102"/>
 		</floor>
 		<ceiling>
 		</ceiling>

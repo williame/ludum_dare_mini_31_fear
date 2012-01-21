@@ -20,7 +20,7 @@ const char* const main_t::game_name = "Ludum Dare Mini 31 - Fear"; // window tit
 class main_game_t: public main_t, private main_t::file_io_t {
 public:
 	main_game_t(void* platform_ptr): main_t(platform_ptr),
-		mode(MODE_LOAD), active_model(NULL), mouse_down(false) {}
+		mode(MODE_LOAD), active_model(NULL), active_object(NULL), mouse_down(false) {}
 	void init();
 	bool tick();
 	void on_io(const std::string& name,bool ok,const std::string& bytes,intptr_t data);
@@ -40,7 +40,8 @@ private:
 	};
 	enum {
 		MODE_LOAD,
-		MODE_OBJECT,
+		MODE_PLACE_OBJECT,
+		MODE_EDIT_OBJECT,
 		MODE_FLOOR,
 		MODE_CEILING,
 	} mode;
@@ -53,7 +54,8 @@ private:
 	struct object_t;
 	typedef std::vector<object_t*> objects_t;
 	objects_t objects;
-	glm::vec2 pan_rate;
+	object_t* active_object;
+	glm::vec2 pan_rate, active_object_anchor;
 	bool mouse_down;
 	float mouse_x, mouse_y;
 	static const float PAN_RATE;
@@ -180,7 +182,7 @@ bool main_game_t::tick() {
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
 		(*i)->artwork.draw(time,projection,(*i)->tx,light0);
 	// show active model on top for editing
-	if((mode == MODE_OBJECT) && active_model && mouse_down) {
+	if((mode == MODE_PLACE_OBJECT) && active_model && mouse_down) {
 		active_model->draw(time,projection,
 			glm::translate(glm::vec3(screen_centre.x+mouse_x-width/2,screen_centre.y-mouse_y+height/2,-50))*active_model->tx,
 			light0,glm::vec4(1,.6,.6,.6));
@@ -231,27 +233,34 @@ bool main_game_t::on_key_down(short code,const input_key_map_t& map,const input_
 	case KEY_RIGHT: pan_rate.x = PAN_RATE; return true;
 	case KEY_UP: pan_rate.y = PAN_RATE; return true;
 	case KEY_DOWN: pan_rate.y = -PAN_RATE; return true;
-	case 'o': mode = MODE_OBJECT; std::cout << "OBJECT MODE " << active_model->path << std::endl; return true;
 	case 'f': mode = MODE_FLOOR; std::cout << "FLOOR MODE" << std::endl; return true;
 	case 'c': mode = MODE_CEILING; std::cout << "CEILING MODE" << std::endl; return true;
+	case 'e': 
+		active_object = NULL;
+		mode = MODE_EDIT_OBJECT;
+		std::cout << "OBJECT EDIT MODE " << (active_object?active_object->artwork.path:"<no selection>") << std::endl; 
+		return true;
+	case 'o':
+		if(mode == MODE_PLACE_OBJECT) {
+			if(!artwork.size()) return false;
+			bool next = false;
+			for(artworks_t::iterator m=artwork.begin(); m!=artwork.end(); m++)
+				if(next) {
+					active_model = m->second;
+					next = false;
+					break;
+				} else
+					next = m->second == active_model;
+			if(next)
+				active_model = artwork.begin()->second;
+		}
+		mode = MODE_PLACE_OBJECT;
+		std::cout << "OBJECT PLACEMENT MODE " << active_model->path << std::endl; 
+		return true;
 	default:
 		switch(mode) {
-		case MODE_OBJECT:
-			if(code == ' ') {
-				if(!artwork.size()) return false;
-				bool next = false;
-				for(artworks_t::iterator m=artwork.begin(); m!=artwork.end(); m++)
-					if(next) {
-						active_model = m->second;
-						next = false;
-						break;
-					} else
-						next = m->second == active_model;
-				if(next)
-					active_model = artwork.begin()->second;
-				std::cout << "OBJECT MODE " << active_model->path << std::endl;
-			}
-			return true;
+		case MODE_EDIT_OBJECT:
+			return false;
 		case MODE_FLOOR:
 			return floor->on_key_down(code,map,mouse);
 		case MODE_CEILING:
@@ -285,6 +294,35 @@ bool main_game_t::on_mouse_down(int x,int y,mouse_button_t button,const input_ke
 	mouse_y = y;
 	const int mapped_x = screen_centre.x+mouse_x-width/2, mapped_y = screen_centre.y-mouse_y+height/2;
 	switch(mode) {
+	case MODE_EDIT_OBJECT:
+		if(button == MOUSE_DRAG) {
+			if(active_object) {
+				const glm::vec2 pos(mapped_x,mapped_y),
+					ofs(pos-active_object_anchor);
+				active_object->pos += ofs;
+				active_object->tx = glm::translate(glm::vec3(ofs,0)) * active_object->tx;
+				active_object_anchor = pos;
+			}
+		} else {
+			active_object = NULL;
+			const glm::vec2 pos(mapped_x,mapped_y);
+			for(objects_t::iterator o=objects.begin(); o!=objects.end(); o++) {
+				glm::vec3 bl1, tr1;
+				(*o)->artwork.bounds(bl1,tr1);
+				const glm::vec4 bl = (*o)->tx * glm::vec4(bl1,1);
+				const glm::vec4 tr = (*o)->tx * glm::vec4(tr1,1);
+				if((pos.x>=bl.x) &&
+					(pos.y>=bl.y) &&
+					(pos.x<tr.x) &&
+					(pos.y<tr.y)) {
+					active_object = *o;
+					active_object_anchor = pos;
+					break;
+				}
+			}
+			std::cout << "OBJECT EDIT MODE " << (active_object?active_object->artwork.path:"<no selection>") << std::endl; 
+		}
+		break;
 	case MODE_FLOOR:
 		floor->on_mouse_down(mapped_x,mapped_y,button,map,mouse);
 		break;
@@ -310,7 +348,7 @@ bool main_game_t::on_mouse_up(int x,int y,mouse_button_t button,const input_key_
 	case MODE_CEILING:
 		ceiling->on_mouse_up(mapped_x,mapped_y,button,map,mouse);
 		break;
-	case MODE_OBJECT:
+	case MODE_PLACE_OBJECT:
 		if(active_model) {
 			std::cout << "creating new object of " << active_model->filename << std::endl;
 			const glm::vec2 pos(mapped_x,mapped_y);
@@ -318,6 +356,7 @@ bool main_game_t::on_mouse_up(int x,int y,mouse_button_t button,const input_key_
 		} else
 			std::cout << "on_mouse_up without active_model" << std::endl;
 		break;
+	default:;
 	}
 	return true;
 }
