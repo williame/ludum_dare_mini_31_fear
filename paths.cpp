@@ -106,7 +106,9 @@ void path_t::draw(const glm::mat4& projection,const glm::vec4& colour) {
 		glBindBuffer(GL_ARRAY_BUFFER,vbo[2]);
 		GLfloat data[2] = {active_node->pos.x,active_node->pos.y};
 		glBufferData(GL_ARRAY_BUFFER,sizeof(data),data,GL_STATIC_DRAW);
+#ifndef __native_client__
 		glPointSize(6.);
+#endif
 		glUniform4fv(uniform_colour,1,glm::value_ptr(glm::vec4(1,0,1,1)));
 		glVertexAttribPointer(attrib_vertex,2,GL_FLOAT,GL_FALSE,0,0);
 		glDrawArrays(GL_POINTS,0,1);
@@ -126,7 +128,9 @@ void path_t::draw(const glm::mat4& projection,const glm::vec4& colour) {
 			glCheck();
 			delete[] data;
 		}
+#ifndef __native_client__ // no glPointSize
 		glPointSize(4.);
+#endif
 		glVertexAttribPointer(attrib_vertex,2,GL_FLOAT,GL_FALSE,0,0);
 		glDrawArrays(GL_POINTS,0,nodes.size());
 		glCheck();

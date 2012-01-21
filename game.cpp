@@ -92,7 +92,7 @@ struct main_game_t::artwork_t: public g3d_t, public g3d_t::loaded_t {
 
 struct main_game_t::object_t {
 	object_t(artwork_t& a,const glm::vec2& p):
-		artwork(a), pos(p), dir(IDLE) {}
+		artwork(a), pos(p), dir(IDLE), state(WALKING) {}
 	artwork_t& artwork;
 	glm::vec2 pos;
 	enum {
@@ -100,6 +100,11 @@ struct main_game_t::object_t {
 		IDLE = 0,
 		RIGHT = 1
 	} dir;
+	enum {
+		WALKING,
+		JUMPING,
+	} state;
+	double jump_gravity;
 	glm::mat4 tx() {
 		glm::mat4 tx(glm::translate(glm::vec3(pos,-artwork.cls))*artwork.tx);
 		if(dir == LEFT)
@@ -108,7 +113,6 @@ struct main_game_t::object_t {
 			tx *= glm::rotate(90.0f,glm::vec3(0,1,0));
 		return tx;
 	}
-	void draw_selection(const glm::mat4& projection,const glm::vec4& colour);
 };
 
 void main_game_t::init() {
@@ -231,11 +235,22 @@ void main_game_t::play_tick(float step) {
 		player_pos(glm::vec2(player->artwork.anchor.x,player->artwork.anchor.y)+player->pos);
 	float floor_y;
 	if(floor->y_at(player_pos,floor_y,true)) {
-		floor_y -= player_pos.y;
-		if(floor_y > player_pos.y)
-			move.y = floor_y;
-		else if(floor_y < player_pos.y)
-			move.y = std::min(floor_y,step);
+		if(player->state == object_t::JUMPING) {
+			player->jump_gravity += 4.0*step;
+			const double jump_up = 200.0*step - player->jump_gravity;
+			if(jump_up+player_pos.y < floor_y) {
+				move.y = floor_y-player_pos.y;
+				player->state = object_t::WALKING;
+			} else
+				move.y = jump_up;
+		} else {
+			assert(player->state == object_t::WALKING);
+			floor_y -= player_pos.y;
+			if(floor_y > player_pos.y)
+				move.y = floor_y;
+			else if(floor_y < player_pos.y)
+				move.y = std::min(floor_y,step);
+		}
 	} else {
 		std::cerr << "LEVEL ERROR: player falls off world!" << std::endl;
 		mode = MODE_FLOOR;
@@ -306,11 +321,21 @@ void main_game_t::play() {
 bool main_game_t::on_key_down(short code,const input_key_map_t& map,const input_mouse_map_t& mouse) {
 	if(mode == MODE_PLAY) {
 		switch(code) {
+		case KEY_UP:
+			if(player->state == object_t::WALKING) {
+				player->jump_gravity = 0;
+				player->state = object_t::JUMPING;
+			}
+			break;
 		case KEY_LEFT:
-			player->dir = object_t::LEFT;
+			if(player->state == object_t::WALKING) {
+				player->dir = object_t::LEFT;
+			}
 			break;
 		case KEY_RIGHT:
-			player->dir = object_t::RIGHT;
+			if(player->state == object_t::WALKING) {
+				player->dir = object_t::RIGHT;
+			}
 			break;
 		default:;
 		}
