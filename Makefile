@@ -79,7 +79,7 @@ ${TARGET}.x86-64.nexe: ${OBJ_NACL_64_CPP} ${OBJ_NACL_64_C}
 all:	check_env ${TARGETS}
 
 run:	check_env ${TARGET}${EXE_EXT}
-ifeq ($(shell uname),windows32)
+ifeq ($(shell uname),MINGW32_NT-6.1) # mingw
 	rm -f bin/stderr.txt bin/stdout.txt
 	(cd bin && ${TARGET_BIN}${EXE_EXT} && cat bin/stdout.txt) || (cat bin/stdout.txt bin/stderr.txt && exit 1)
 else
