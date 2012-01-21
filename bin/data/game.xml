@@ -1,16 +1,19 @@
 <game>
 	<artwork>
-		<asset id="w1" type="g3d" class="back" path="data/tunnel_back1.g3d" scale_factor="20"/>
-		<asset id="w2" type="g3d" class="monster" path="data/spider1.g3d" scale_factor="20"/>
-		<asset id="w3" type="g3d" class="monster" path="data/spider_run.g3d" scale_factor="20"/>
+		<asset id="b1" type="g3d" class="back" path="data/tunnel_back1.g3d" scale_factor="30"/>
+		<asset id="b2" type="g3d" class="back" path="data/tunnel_back2.g3d" scale_factor="30"/>
+		<asset id="b3" type="g3d" class="back" path="data/tunnel_back3.g3d" scale_factor="30"/>
+		<asset id="b4" type="g3d" class="back" path="data/tunnel_back4.g3d" scale_factor="30"/>
+		<asset id="b5" type="g3d" class="back" path="data/tunnel_back5.g3d" scale_factor="30"/>
+		<asset id="b6" type="g3d" class="back" path="data/tunnel_back_fork1_closed.g3d" scale_factor="30"/>
+		<asset id="b7" type="g3d" class="back" path="data/tunnel_back_fork1_open.g3d" scale_factor="30"/>
+		<asset id="m1" type="g3d" class="monster" path="data/spider1.g3d" scale_factor="30"/>
+		<asset id="m2" type="g3d" class="monster" path="data/spider_run.g3d" scale_factor="30"/>
 	</artwork>
 	<level>
-		<object asset="w1" x="-116" y="74"/>
-		<object asset="w1" x="172" y="70"/>
-		<object asset="w3" x="3" y="16"/>
-		<object asset="w3" x="143" y="15"/>
-		<object asset="w3" x="244" y="13"/>
-		<floor/>
-		<ceiling/>
+		<floor>
+		</floor>
+		<ceiling>
+		</ceiling>
 	</level>
 </game>

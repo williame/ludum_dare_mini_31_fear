@@ -243,6 +243,11 @@ void main_game_t::save() {
 	xml << "\t</artwork>\n\t<level>\n";
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
 		xml << "\t\t<object asset=\"" << (*i)->artwork.id << "\" x=\"" << (*i)->pos.x << "\" y=\"" << (*i)->pos.y << "\"/>\n"; 
+	xml << "\t\t<floor>\n";
+	floor->save(xml);
+	xml << "\t\t</floor>\n\t\t<ceiling>\n";
+	ceiling->save(xml);
+	xml << "\t\t</ceiling>\n";
 	xml << "\t</level>\n</game>\n";
 #ifdef __native_client__
 	std::cout << xml.str();
