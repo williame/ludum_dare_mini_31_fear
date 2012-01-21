@@ -38,7 +38,7 @@ private:
 	};
 	enum {
 		MODE_LOAD,
-		MODE_EDIT,
+		MODE_PLACE_OBJECT,
 	} mode;
 	xml_parser_t game_xml;
 	glm::vec2 screen_centre;
@@ -139,7 +139,7 @@ struct main_game_t::path_t {
 
 void main_game_t::init() {
 	create_shaders(*this);
-	glClearColor(.4,.2,.6,1.);
+	glClearColor(1,0,0,1);
 	read_file("data/game.xml",this,LOAD_GAME_XML);
 }
 
@@ -186,7 +186,7 @@ void main_game_t::on_io(const std::string& name,bool ok,const std::string& bytes
 void main_game_t::on_ready(artwork_t*) {
 	if(is_ready()) {
 		std::cout << "artwork all loaded" << std::endl;
-		mode = MODE_EDIT;
+		mode = MODE_PLACE_OBJECT;
 		xml_walker_t xml(game_xml.walker());
 		xml.check("game").get_child("level");
 		for(int i=0; xml.get_child("object",i); i++, xml.up()) {
@@ -203,6 +203,7 @@ void main_game_t::on_ready(artwork_t*) {
 		ceiling.reset(new path_t());
 		ceiling->load(xml);
 		xml.up();
+		glClearColor(1,1,1,1);
 	}
 }
 
@@ -220,17 +221,17 @@ bool main_game_t::tick() {
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
 		(*i)->artwork.draw(time,projection,(*i)->tx,light0);
 	// show active model on top for editing
-	if(active_model && mouse_down) {
+	if((mode == MODE_PLACE_OBJECT) && active_model && mouse_down) {
 		active_model->draw(time,projection,
 			glm::translate(glm::vec3(screen_centre.x+mouse_x-width/2,screen_centre.y-mouse_y+height/2,-20))*active_model->tx,
-			light0,glm::vec4(1,0,.2,.4));
+			light0,glm::vec4(1,.6,.6,.6));
 	}
 	return true; // return false to exit program
 }
 
 void main_game_t::save() {
-	if(mode != MODE_EDIT) {
-		std::cout << "cannot save whilst not editing" << std::endl;
+	if(mode == MODE_LOAD) {
+		std::cout << "cannot save whilst loading" << std::endl;
 		return;
 	}
 	std::cout << "saving..." << std::endl;
