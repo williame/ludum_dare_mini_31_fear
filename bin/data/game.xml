@@ -28,9 +28,60 @@
 		<object asset="b5" x="1633" y="-173"/>
 		<object asset="m4" x="-482" y="-81"/>
 		<object asset="g1" x="31" y="-79"/>
+		<object asset="m2" x="571" y="-72"/>
 		<floor>
+			<node id="0" x="-690" y="-82"/>
+			<node id="1" x="962" y="-77"/>
+			<node id="2" x="1037" y="-100"/>
+			<node id="3" x="1083" y="-100"/>
+			<node id="4" x="1149" y="-134"/>
+			<node id="5" x="1194" y="-156"/>
+			<node id="6" x="1207" y="-176"/>
+			<node id="7" x="1220" y="-188"/>
+			<node id="8" x="1250" y="-211"/>
+			<node id="9" x="1298" y="-238"/>
+			<node id="10" x="1351" y="-247"/>
+			<node id="11" x="1446" y="-268"/>
+			<node id="12" x="1847" y="-270"/>
+			<node id="13" x="1837" y="-20"/>
+			<node id="15" x="1206" y="-15"/>
+			<node id="16" x="1205" y="-41"/>
+			<node id="17" x="1149" y="-40"/>
+			<node id="18" x="1147" y="-64"/>
+			<node id="19" x="1089" y="-70"/>
+			<node id="20" x="1084" y="-97"/>
+			<link a="0" b="1"/>
+			<link a="1" b="2"/>
+			<link a="2" b="3"/>
+			<link a="3" b="4"/>
+			<link a="4" b="5"/>
+			<link a="5" b="6"/>
+			<link a="6" b="7"/>
+			<link a="7" b="8"/>
+			<link a="8" b="9"/>
+			<link a="9" b="10"/>
+			<link a="10" b="11"/>
+			<link a="11" b="12"/>
+			<link a="13" b="15"/>
+			<link a="15" b="16"/>
+			<link a="16" b="17"/>
+			<link a="17" b="18"/>
+			<link a="18" b="19"/>
+			<link a="19" b="20"/>
+			<link a="20" b="3"/>
 		</floor>
 		<ceiling>
+			<node id="0" x="-695" y="113"/>
+			<node id="1" x="998" y="115"/>
+			<node id="2" x="1131" y="178"/>
+			<node id="3" x="1357" y="179"/>
+			<node id="4" x="1401" y="177"/>
+			<node id="5" x="1838" y="175"/>
+			<link a="0" b="1"/>
+			<link a="1" b="2"/>
+			<link a="2" b="3"/>
+			<link a="3" b="4"/>
+			<link a="4" b="5"/>
 		</ceiling>
 	</level>
 </game>
