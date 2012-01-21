@@ -145,7 +145,7 @@ void main_game_t::on_io(const std::string& name,bool ok,const std::string& bytes
 void main_game_t::on_ready(artwork_t*) {
 	if(is_ready()) {
 		std::cout << "artwork all loaded" << std::endl;
-		mode = MODE_FLOOR;
+		mode = MODE_PLACE_OBJECT;
 		xml_walker_t xml(game_xml.walker());
 		xml.check("game").get_child("level");
 		for(int i=0; xml.get_child("object",i); i++, xml.up()) {
