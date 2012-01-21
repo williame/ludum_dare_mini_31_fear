@@ -78,13 +78,16 @@ struct main_game_t::artwork_t: public g3d_t, public g3d_t::loaded_t {
 		CLS_MONSTER = 90,
 		CLS_PLAYER = 89,
 	};
-	artwork_t(main_game_t& main,const std::string& id_,const std::string& p,class_t c,float sf,float sp):
-		g3d_t(main,p,this), game(main), id(id_), path(p), cls(c), tx(glm::scale(glm::vec3(sf,sf,sf))),
+	artwork_t(main_game_t& main,const std::string& id_,const std::string& p,class_t c,float sf,float sp,const glm::vec3& a):
+		g3d_t(main,p,this), game(main), id(id_), path(p), cls(c),
+		tx(glm::scale(glm::vec3(sf,sf,sf))),
+		anchor(glm::scale(glm::vec3(sf,sf,sf))*glm::vec4(a,1)),
 		scale_factor(sf), speed(sp) {}
 	main_game_t& game;
 	const std::string id, path;
 	class_t cls;
 	const glm::mat4 tx;
+	const glm::vec4 anchor;
 	const float scale_factor, speed;
 	void on_g3d_loaded(g3d_t& g3d,bool ok,intptr_t data) {
 		if(!ok) data_error("failed to load " << filename);
@@ -128,6 +131,10 @@ void main_game_t::on_io(const std::string& name,bool ok,const std::string& bytes
 				path = xml.value_string("path");
 			const float scaler = xml.has_key("scale_factor")? xml.value_float("scale_factor"):1.0;
 			const float speed = xml.has_key("speed")? xml.value_float("speed"):0;
+			const glm::vec3 anchor(
+				xml.has_key("anchor_x")? xml.value_float("anchor_x"):0,
+				xml.has_key("anchor_y")? xml.value_float("anchor_y"):0,
+				xml.has_key("anchor_z")? xml.value_float("anchor_z"):0);
 			artwork_t::class_t cls;
 			if(scls == "back") cls = artwork_t::CLS_BACK;
 			else if(scls=="monster") cls = artwork_t::CLS_MONSTER;
@@ -137,7 +144,7 @@ void main_game_t::on_io(const std::string& name,bool ok,const std::string& bytes
 				data_error("dupicate asset ID " << id);
 			if(type == "g3d") {
 				std::cout << "loading G3D " << path << std::endl;
-				artwork[id] = new artwork_t(*this,id,path,cls,scaler,speed);
+				artwork[id] = new artwork_t(*this,id,path,cls,scaler,speed,anchor);
 				if(!active_model) active_model = artwork[id];
 			} else
 				data_error("unsupported artwork type "<<type);
@@ -212,9 +219,21 @@ bool main_game_t::tick() {
 
 void main_game_t::play_tick(float step) {
 	// move main player
-	const float move_x = player->artwork.speed * step * player_dir;
-	player->pos.x += move_x;
-	player->tx = glm::translate(glm::vec3(move_x,0,0)) * player->tx;
+	glm::vec2 move(player->artwork.speed * step * player_dir,0),
+		player_pos(glm::vec2(player->artwork.anchor.x,player->artwork.anchor.y)+player->pos);
+	float floor_y;
+	if(floor->y_at(player_pos,floor_y,true)) {
+		if(floor_y > player_pos.y)
+			move.y = floor_y;
+		else if(floor_y < player_pos.y)
+			move.y = std::min(floor_y,step);
+	} else {
+		std::cerr << "LEVEL ERROR: player falls off world!" << std::endl;
+		mode = MODE_FLOOR;
+		return;
+	}
+	player->pos += move;
+	player->tx = glm::translate(glm::vec3(move,0)) * player->tx;
 }
 
 void main_game_t::save() {
@@ -276,8 +295,12 @@ void main_game_t::play() {
 bool main_game_t::on_key_down(short code,const input_key_map_t& map,const input_mouse_map_t& mouse) {
 	if(mode == MODE_PLAY) {
 		switch(code) {
-		case KEY_LEFT: player_dir = -1; return true;
-		case KEY_RIGHT: player_dir = 1; return true;
+		case KEY_LEFT:
+			player_dir = -1;
+			break;
+		case KEY_RIGHT:
+			player_dir = 1;
+			break;
 		default:;
 		}
 		return true;
@@ -331,7 +354,9 @@ bool main_game_t::on_key_up(short code,const input_key_map_t& map,const input_mo
 	if(mode == MODE_PLAY) {
 		switch(code) {
 		case KEY_LEFT:
-		case KEY_RIGHT: player_dir = 0; return true;
+		case KEY_RIGHT:
+			player_dir = 0;
+			break;
 		default:;
 		}
 		return true;

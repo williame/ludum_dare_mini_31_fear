@@ -18,6 +18,21 @@ path_t::path_t(main_t& m): main(m), program(m.get_shared_program("path_t")),
 	attrib_vertex = main.get_attribute_loc(program,"VERTEX",GL_FLOAT_VEC2);
 }
 
+bool path_t::y_at(const glm::vec2& p,float& y,bool down) const {
+	bool found = false;
+	for(links_t::const_iterator l=links.begin(); l!=links.end(); l++) {
+		const glm::vec3 closest = glm::closestPointOnLine(glm::vec3(p,0),glm::vec3((*l)->a->pos,0),glm::vec3((*l)->b->pos,0));
+		if((int)closest.x == (int)p.x) {
+			const float d = closest.y - p.y;
+			if(found && ((down && (d<y)) || (!down && (d>y))))
+				continue;
+			found = true;
+			y = closest.y;
+		}
+	}
+	return found;
+}
+
 path_t::node_t* path_t::get_node(int id,bool null) {
 	for(nodes_t::iterator i=nodes.begin(); i!=nodes.end(); i++)
 		if((*i)->id == id) return *i;
