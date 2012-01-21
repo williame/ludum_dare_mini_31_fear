@@ -223,6 +223,8 @@ void main_game_t::play_tick(float step) {
 		player_pos(glm::vec2(player->artwork.anchor.x,player->artwork.anchor.y)+player->pos);
 	float floor_y;
 	if(floor->y_at(player_pos,floor_y,true)) {
+		floor_y -= player_pos.y;
+		std::cout << "player " << player_pos.x << ',' << player_pos.y << ", floor " << floor_y << std::endl;
 		if(floor_y > player_pos.y)
 			move.y = floor_y;
 		else if(floor_y < player_pos.y)
