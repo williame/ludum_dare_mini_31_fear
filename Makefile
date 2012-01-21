@@ -17,7 +17,7 @@ NACL_LDFLAGS = -lppapi -lppapi_cpp -lppapi_gles2
 
 # generic flags
 
-CFLAGS = -g3 -Wall -O0 -DGLEW_STATIC #-pedantic-errors -std=c++98 -Wno-long-long -fdiagnostics-show-option
+CFLAGS = -g3 -Wall -O0 #-pedantic-errors -std=c++98 -Wno-long-long -fdiagnostics-show-option
 # -O9 -fomit-frame-pointer -march=native # etc -fprofile-generate/-fprofile-use
 
 BUILD_TIMESTAMP = $(shell date +%y%m%d-%H%M%S)
@@ -47,8 +47,12 @@ OBJ_BASE_C = \
 	external/SOIL/SOIL.o \
 	external/SOIL/image_helper.o \
 	external/SOIL/stb_image_aug.o \
-	external/SOIL/image_DXT.o \
-	external/glew/glew.o
+	external/SOIL/image_DXT.o
+	
+ifeq ($(shell uname),MINGW32_NT-6.1) # mingw
+	OBJ_BASE_C += external/glew/glew.o
+	CFLAGS += -DGLEW_STATIC
+endif
 
 OBJ_SDL_C = $(OBJ_BASE_C:%.o=%.sdl.o)
 

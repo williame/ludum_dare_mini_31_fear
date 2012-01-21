@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include "paths.hpp"
 #include "barebones/xml.hpp"
 #include "external/ogl-math/glm/gtx/closest_point.hpp"
@@ -20,14 +22,21 @@ path_t::path_t(main_t& m): main(m), program(m.get_shared_program("path_t")),
 
 bool path_t::y_at(const glm::vec2& p,float& y,bool down) const {
 	bool found = false;
+	glm::vec2 best;
 	for(links_t::const_iterator l=links.begin(); l!=links.end(); l++) {
-		const glm::vec3 closest = glm::closestPointOnLine(glm::vec3(p,0),glm::vec3((*l)->a->pos,0),glm::vec3((*l)->b->pos,0));
-		if((int)closest.x == (int)p.x) {
-			const float d = closest.y - p.y;
-			if(found && ((down && (d<y)) || (!down && (d>y))))
+		const node_t* a = (*l)->a, *b = (*l)->b;
+		if(a->pos.x > b->pos.x) std::swap(a,b);
+		if(fabsf(a->pos.x-b->pos.x)<1) continue;
+		if(p.x >= a->pos.x && p.x <= b->pos.x) {
+			const float mu = fabsf(p.x-a->pos.x)<1?0:
+				fabsf(p.x-b->pos.x)<1?1:
+				(p.x-a->pos.x)/(b->pos.x-a->pos.x);
+			const glm::vec2 pos(p.x,a->pos.y*(1-mu)+b->pos.y*mu);
+			if(found && (distance(p,best) < distance(pos,best)))
 				continue;
+			best = pos;
+			y = pos.y;
 			found = true;
-			y = closest.y;
 		}
 	}
 	return found;
