@@ -204,7 +204,6 @@ namespace {
 			std::cout << "FREQ "<<li.QuadPart<<","<<freq<<std::endl;
 			inited = true;
 		}
-		std::cout<<"NOW "<<(now.QuadPart-base)<<","<<(now.QuadPart-base)/freq<<std::endl;
 		return (now.QuadPart-base)/freq;	
 	}
 #elif defined(__native_client__)
