@@ -20,7 +20,7 @@ const char* const main_t::game_name = "Ludum Dare Mini 31 - Fear"; // window tit
 class main_game_t: public main_t, private main_t::file_io_t {
 public:
 	main_game_t(void* platform_ptr): main_t(platform_ptr),
-		mode(MODE_LOAD), active_model(NULL), active_object(NULL), mouse_down(false) {}
+		mode(MODE_LOAD), active_model(NULL), active_object(NULL), player(NULL), mouse_down(false) {}
 	void init();
 	bool tick();
 	void on_io(const std::string& name,bool ok,const std::string& bytes,intptr_t data);
@@ -35,6 +35,8 @@ private:
 	void on_ready(artwork_t* artwork);
 	bool is_ready() const;
 	void save();
+	void play();
+	void play_tick(float step);
 	enum {
 		LOAD_GAME_XML,
 	};
@@ -44,6 +46,7 @@ private:
 		MODE_EDIT_OBJECT,
 		MODE_FLOOR,
 		MODE_CEILING,
+		MODE_PLAY
 	} mode;
 	xml_parser_t game_xml;
 	glm::vec2 screen_centre;
@@ -56,6 +59,8 @@ private:
 	objects_t objects;
 	object_t* active_object;
 	glm::vec2 pan_rate, active_object_anchor;
+	object_t* player;
+	float player_dir;
 	bool mouse_down;
 	float mouse_x, mouse_y;
 	static const float PAN_RATE;
@@ -71,16 +76,16 @@ struct main_game_t::artwork_t: public g3d_t, public g3d_t::loaded_t {
 	enum class_t {
 		CLS_BACK = 150,
 		CLS_MONSTER = 90,
+		CLS_PLAYER = 89,
 	};
-	artwork_t(main_game_t& main,const std::string& id_,const std::string& p,class_t c,float s):
-		g3d_t(main,p,this), game(main), id(id_), path(p), cls(c), tx(glm::scale(glm::vec3(s,s,s))),
-		scale_factor(s) {
-	}
+	artwork_t(main_game_t& main,const std::string& id_,const std::string& p,class_t c,float sf,float sp):
+		g3d_t(main,p,this), game(main), id(id_), path(p), cls(c), tx(glm::scale(glm::vec3(sf,sf,sf))),
+		scale_factor(sf), speed(sp) {}
 	main_game_t& game;
 	const std::string id, path;
 	class_t cls;
 	const glm::mat4 tx;
-	const float scale_factor;
+	const float scale_factor, speed;
 	void on_g3d_loaded(g3d_t& g3d,bool ok,intptr_t data) {
 		if(!ok) data_error("failed to load " << filename);
 		game.on_ready(this);
@@ -122,15 +127,17 @@ void main_game_t::on_io(const std::string& name,bool ok,const std::string& bytes
 				scls = xml.value_string("class"),
 				path = xml.value_string("path");
 			const float scaler = xml.has_key("scale_factor")? xml.value_float("scale_factor"):1.0;
+			const float speed = xml.has_key("speed")? xml.value_float("speed"):0;
 			artwork_t::class_t cls;
 			if(scls == "back") cls = artwork_t::CLS_BACK;
 			else if(scls=="monster") cls = artwork_t::CLS_MONSTER;
+			else if(scls=="player") cls = artwork_t::CLS_PLAYER;
 			else data_error(scls << " is not a supported artwork class");
 			if(artwork.find(id) != artwork.end())
 				data_error("dupicate asset ID " << id);
 			if(type == "g3d") {
 				std::cout << "loading G3D " << path << std::endl;
-				artwork[id] = new artwork_t(*this,id,path,cls,scaler);
+				artwork[id] = new artwork_t(*this,id,path,cls,scaler,speed);
 				if(!active_model) active_model = artwork[id];
 			} else
 				data_error("unsupported artwork type "<<type);
@@ -172,8 +179,11 @@ bool main_game_t::tick() {
 	const double elapsed = (double)(now-first_tick)/1000000000, // seconds
 		time = fmod(elapsed*.5,1), // cycle every 2 seconds
 		since_last = (double)(now-last_tick)/1000000000;
-	//std::cout << "elapsed=" << elapsed << ", since_last=" << since_last << std::endl;
-	screen_centre += pan_rate * glm::vec2(since_last,since_last);
+	if(mode == MODE_PLAY) {
+		play_tick(since_last);
+		screen_centre = player->pos;
+	} else
+		screen_centre += pan_rate * glm::vec2(since_last,since_last);
 	const glm::mat4 projection(glm::ortho<float>(
 		screen_centre.x-width/2,screen_centre.x+width/2,
 		screen_centre.y-height/2,screen_centre.y+height/2, // y increases upwards
@@ -182,25 +192,34 @@ bool main_game_t::tick() {
 	// show all the objects
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
 		(*i)->artwork.draw(time,projection,(*i)->tx,light0);
-	// show active model on top for editing
-	if((mode == MODE_PLACE_OBJECT) && active_model && mouse_down) {
-		active_model->draw(time,projection,
-			glm::translate(glm::vec3(screen_centre.x+mouse_x-width/2,screen_centre.y-mouse_y+height/2,-50))*active_model->tx,
-			light0,glm::vec4(1,.6,.6,.6));
+	if(mode != MODE_PLAY) {
+		// show active model on top for editing
+		if((mode == MODE_PLACE_OBJECT) && active_model && mouse_down) {
+			active_model->draw(time,projection,
+				glm::translate(glm::vec3(screen_centre.x+mouse_x-width/2,screen_centre.y-mouse_y+height/2,-50))*active_model->tx,
+				light0,glm::vec4(1,.6,.6,.6));
+		}
+		// floor and ceiling
+		if(floor.get())
+			floor->draw(projection,glm::vec4(1,0,0,1));
+		if(ceiling.get())
+			ceiling->draw(projection,glm::vec4(1,1,0,1));
 	}
-	// floor and ceiling
-	if(floor.get())
-		floor->draw(projection,glm::vec4(1,0,0,1));
-	if(ceiling.get())
-		ceiling->draw(projection,glm::vec4(1,1,0,1));
 	// done
 	last_tick = now;
 	return true; // return false to exit program
 }
 
+void main_game_t::play_tick(float step) {
+	// move main player
+	const float move_x = player->artwork.speed * step * player_dir;
+	player->pos.x += move_x;
+	player->tx = glm::translate(glm::vec3(move_x,0,0)) * player->tx;
+}
+
 void main_game_t::save() {
-	if(mode == MODE_LOAD) {
-		std::cout << "cannot save whilst loading" << std::endl;
+	if((mode == MODE_LOAD) || (mode == MODE_PLAY)) {
+		std::cout << "cannot save in this mode" << std::endl;
 		return;
 	}
 	std::cout << "saving..." << std::endl;
@@ -228,7 +247,41 @@ void main_game_t::save() {
 #endif
 }
 
+void main_game_t::play() {
+	// find player object
+	player = NULL;
+	for(objects_t::iterator o=objects.begin(); o!=objects.end(); o++)
+		if((*o)->artwork.cls == artwork_t::CLS_PLAYER) {
+			if(player) {
+				std::cerr << "There is more than one player!  Cannot play." << std::endl;
+				player = NULL;
+				return;
+			} else
+				player = *o;
+		}
+	if(!player) {
+		std::cerr << "There is no player!  Cannot play." << std::endl;
+		return;
+	}
+	if(!player->artwork.speed) {
+		std::cerr << "The player cannot move!  Add a speed= parameter to the xml!" << std::endl;
+		return;
+	}
+	mode = MODE_PLAY;
+	pan_rate = glm::vec2(0,0);
+	player_dir = 0;
+	std::cout << "Playing game!" << std::endl;
+}
+
 bool main_game_t::on_key_down(short code,const input_key_map_t& map,const input_mouse_map_t& mouse) {
+	if(mode == MODE_PLAY) {
+		switch(code) {
+		case KEY_LEFT: player_dir = -1; return true;
+		case KEY_RIGHT: player_dir = 1; return true;
+		default:;
+		}
+		return true;
+	}
 	switch(code) {
 	case KEY_LEFT: pan_rate.x = -PAN_RATE; return true;
 	case KEY_RIGHT: pan_rate.x = PAN_RATE; return true;
@@ -258,6 +311,9 @@ bool main_game_t::on_key_down(short code,const input_key_map_t& map,const input_
 		mode = MODE_PLACE_OBJECT;
 		std::cout << "OBJECT PLACEMENT MODE " << active_model->path << std::endl; 
 		return true;
+	case 'p':
+		play();
+		return true;
 	default:
 		switch(mode) {
 		case MODE_EDIT_OBJECT:
@@ -272,6 +328,14 @@ bool main_game_t::on_key_down(short code,const input_key_map_t& map,const input_
 }
 
 bool main_game_t::on_key_up(short code,const input_key_map_t& map,const input_mouse_map_t& mouse) {
+	if(mode == MODE_PLAY) {
+		switch(code) {
+		case KEY_LEFT:
+		case KEY_RIGHT: player_dir = 0; return true;
+		default:;
+		}
+		return true;
+	}
 	switch(code) {
 	case KEY_LEFT:
 	case KEY_RIGHT: pan_rate.x = 0; return true;
