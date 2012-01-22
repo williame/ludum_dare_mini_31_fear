@@ -73,8 +73,8 @@ void create_shaders(main_t& main) {
 			"uniform sampler2D TEX_UNIT_0;\n"
 			"varying vec2 tex_coord_0;\n"
 			"void main() {\n"
-			"	vec3 texel = texture2D(TEX_UNIT_0,tex_coord_0).rgb;\n"
-			"	gl_FragColor = vec4(texel*COLOUR.rgb,COLOUR.a);\n"
+			"	vec4 texel = texture2D(TEX_UNIT_0,tex_coord_0);\n"
+			"	gl_FragColor = texel*COLOUR;\n"
 			"}\n"));
 }
 

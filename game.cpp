@@ -43,6 +43,11 @@ struct rect_t {
 		ret.normalise(); // so we don't care if it turns inside out
 		return ret;
 	}
+	rect_t grow(const glm::vec2& margin) const {
+		rect_t ret(bl-margin,tr+margin);
+		ret.normalise(); // so we don't care if it turns inside out
+		return ret;
+	}
 	void draw(main_t& main,const glm::mat4& mvp,glm::vec4 colour);
 };
 
@@ -130,7 +135,7 @@ struct main_game_t::artwork_t {
 	const glm::mat4 tx;
 	const glm::vec3 anchor;
 	const float scale_factor, speed, animation_length;
-	const float attack_points, health_points;
+	const float attack_points, health_points, attack_range, defend_range;
 	virtual void draw(float time,const glm::mat4& projection,const glm::mat4& modelview,const glm::vec3& light0,const glm::vec4& colour = glm::vec4(1,1,1,1)) = 0;
 	virtual artwork_t* get_child(const std::string& id) = 0;
 	virtual void bounds(glm::vec3& min,glm::vec3& max) = 0;
@@ -164,12 +169,13 @@ protected:
 		if(!ok) data_error("failed to load " << id);
 		game.on_ready(this);
 	}
-	artwork_t(main_game_t& g,artwork_t* p,const std::string& id_,const std::string& n,class_t c,float sf,const glm::vec3& a,float sp,float al,float ap,float hp):
+	artwork_t(main_game_t& g,artwork_t* p,const std::string& id_,const std::string& n,class_t c,float sf,
+		const glm::vec3& a,float sp,float al,float ap,float hp,float ar,float dr):
 		game(g), parent(p), id(id_), name(n), cls(c),
 		tx(glm::scale(glm::vec3(sf,sf,sf))),
 		anchor(a),
 		scale_factor(sf), speed(sp), animation_length(al),
-		attack_points(ap), health_points(hp), _bounds(false) {}
+		attack_points(ap), health_points(hp), attack_range(ar), defend_range(dr), _bounds(false) {}
 private:
 	rect_t _rect;
 	bool _bounds;
@@ -177,8 +183,8 @@ private:
 
 struct artwork_splash_t: public main_game_t::artwork_t, private main_t::texture_load_t {
 	artwork_splash_t(main_game_t& main,artwork_t* parent,const std::string& id_,const std::string& p,class_t c,float sf,float sp,
-		const glm::vec3& a,float al,float attack_points,float health_points):
-		artwork_t(main,parent,id_,p,c,sf,a,sp,al,attack_points,health_points),
+		const glm::vec3& a,float al,float attack_points,float health_points,float attack_range,float defend_range):
+		artwork_t(main,parent,id_,p,c,sf,a,sp,al,attack_points,health_points,attack_range,defend_range),
 		path(p), texture(0) {
 			main.load_texture(path,this,0);
 		}
@@ -231,14 +237,14 @@ struct artwork_splash_t: public main_game_t::artwork_t, private main_t::texture_
 			cls == artwork_t::CLS_SPECIAL?"special":
 			cls == artwork_t::CLS_FRONT?"front":
 			cls == artwork_t::CLS_MONSTER?"monster":
-				"BUG") << "\" path=\"" << path << "\"/>";
+				"BUG") << "\" path=\"" << path << "\"/>\n";
 	}
 };
 
 struct artwork_set_t: public main_game_t::artwork_t {
 	artwork_set_t(main_game_t& main,artwork_t* parent,const std::string& id_,class_t c,float sf,float sp,
-		const glm::vec3& a,float al,float attack_points,float health_points):
-		artwork_t(main,parent,id_,id_,c,sf,a,sp,al,attack_points,health_points) {}
+		const glm::vec3& a,float al,float attack_points,float health_points,float attack_range,float defend_range):
+		artwork_t(main,parent,id_,id_,c,sf,a,sp,al,attack_points,health_points,attack_range,defend_range) {}
 	~artwork_set_t() {
 		for(artworks_t::iterator i=artwork.begin(); i!=artwork.end(); i++)
 			delete *i;
@@ -289,6 +295,10 @@ struct artwork_set_t: public main_game_t::artwork_t {
 			xml << " attack_points=\"" << attack_points << "\"";
 		if(health_points)
 			xml << " health_points=\"" << health_points << "\"";
+		if(attack_range)
+			xml << " attack_range=\"" << attack_range << "\"";
+		if(defend_range)
+			xml << " defend_range=\"" << defend_range << "\"";
 		if(anchor.x)
 			xml << " anchor_x=\"" << anchor.x << "\"";
 		if(anchor.y)
@@ -310,8 +320,8 @@ struct artwork_set_t: public main_game_t::artwork_t {
 
 struct artwork_g3d_t: public main_game_t::artwork_t, private g3d_t::loaded_t {
 	artwork_g3d_t(main_game_t& main,artwork_t* parent,const std::string& id_,const std::string& p,class_t c,float sf,float sp,
-		const glm::vec3& a,float al,float attack_points,float health_points):
-		artwork_t(main,parent,id_,p,c,sf,a,sp,al,attack_points,health_points),
+		const glm::vec3& a,float al,float attack_points,float health_points,float attack_range,float defend_range):
+		artwork_t(main,parent,id_,p,c,sf,a,sp,al,attack_points,health_points,attack_range,defend_range),
 		path(p), g3d(main,p,this), _ready(false) {}
 	const std::string path;
 	g3d_t g3d;
@@ -349,6 +359,10 @@ struct artwork_g3d_t: public main_game_t::artwork_t, private g3d_t::loaded_t {
 			xml << " attack_points=\"" << attack_points << "\"";
 		if(health_points)
 			xml << " health_points=\"" << health_points << "\"";
+		if(attack_range)
+			xml << " attack_range=\"" << attack_range << "\"";
+		if(defend_range)
+			xml << " defend_range=\"" << defend_range << "\"";
 		if(anchor.x != 0)
 			xml << " anchor_x=\"" << anchor.x << "\"";
 		if(anchor.y != 0)
@@ -385,16 +399,18 @@ main_game_t::artwork_t* main_game_t::load_asset(xml_walker_t& xml,artwork_t* par
 	const float animation_length = xml.has_key("animation_length")? xml.value_float("animation_length"): 0;
 	const float attack_points = xml.has_key("attack_points")? xml.value_float("attack_points"): 0;
 	const float health_points = xml.has_key("health_points")? xml.value_float("health_points"): 0;
+	const float attack_range = xml.has_key("attack_range")? xml.value_float("attack_range"): 0;
+	const float defend_range = xml.has_key("defend_range")? xml.value_float("defend_range"): 0;
 	if(type == "g3d") {
 		const std::string path = xml.value_string("path");
 		std::cout << "loading G3D " << path << std::endl;
-		return new artwork_g3d_t(*this,parent,id,path,cls,scaler,speed,anchor,animation_length,attack_points,health_points);
+		return new artwork_g3d_t(*this,parent,id,path,cls,scaler,speed,anchor,animation_length,attack_points,health_points,attack_range,defend_range);
 	} else if(type == "splash") {
 		const std::string path = xml.value_string("path");
 		std::cout << "loading splash " << path << std::endl;
-		return new artwork_splash_t(*this,parent,id,path,cls,scaler,speed,anchor,animation_length,attack_points,health_points);
+		return new artwork_splash_t(*this,parent,id,path,cls,scaler,speed,anchor,animation_length,attack_points,health_points,attack_range,defend_range);
 	} else if(type == "set") {
-		artwork_set_t* set = new artwork_set_t(*this,parent,id,cls,scaler,speed,anchor,animation_length,attack_points,health_points);
+		artwork_set_t* set = new artwork_set_t(*this,parent,id,cls,scaler,speed,anchor,animation_length,attack_points,health_points,attack_range,defend_range);
 		for(int i=0; xml.get_child("asset",i); i++, xml.up())
 			set->artwork.push_back(load_asset(xml,set));
 		return set;
@@ -404,7 +420,7 @@ main_game_t::artwork_t* main_game_t::load_asset(xml_walker_t& xml,artwork_t* par
 
 struct main_game_t::object_t {
 	object_t(artwork_t& a,const glm::vec2& p):
-		artwork(a), pos(p), state(WALKING), attacking(false), waiting(true),
+		artwork(a), pos(p), state(WALKING), attacking(false), defending(false), waiting(true),
 		health_points(a.health_points), bury(false) {
 			dir[WALKING] = dir[JUMPING] = EDITOR;
 			action[WALKING] = action[JUMPING] = "idle";
@@ -424,7 +440,7 @@ struct main_game_t::object_t {
 		EDITOR = 0,
 		RIGHT = 1
 	} dir[STATE_LAST];
-	bool attacking;
+	bool attacking, defending;
 	bool waiting;
 	double jump_gravity, jump_energy;
 	float health_points;
@@ -470,6 +486,12 @@ struct main_game_t::object_t {
 		const glm::vec2 anchor(artwork.anchor.x,pos.y-artwork.anchor.y);
 		rect_t rect = active_artwork[state]->rect();
 		return rect_t(rect.bl+pos,rect.tr+pos);
+	}
+	rect_t attack_rect() const {
+		return effective_rect().grow(glm::vec2(artwork.attack_range,0));
+	}
+	rect_t defend_rect() const {
+		return effective_rect().grow(glm::vec2(artwork.defend_range,0));
 	}
 	bool is_dead() const { return (health_points <= 0) && artwork.health_points; }
 	bool bury;
@@ -577,7 +599,7 @@ void main_game_t::on_ready(artwork_t*) {
 		glClearColor(1,1,1,1);
 		
 		//###
-		play();
+		//play();
 	}
 }
 
@@ -608,8 +630,10 @@ bool main_game_t::tick() {
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++) {
 		if((*i)->is_visible(screen))
 			(*i)->draw(now,projection,light0);
-		//if((*i)->attacking)
-		//	(*i)->effective_rect().draw(*this,projection,glm::vec4(1,0,0,1));
+		if((*i)->defending)
+			(*i)->defend_rect().draw(*this,projection,glm::vec4(1,1,1,.5));
+		if((*i)->attacking)
+			(*i)->attack_rect().draw(*this,projection,glm::vec4(1,0,0,.5));
 		if((mode == MODE_PLAY) && (*i)->is_dead() && (*i)->bury && *i!=player)
 			reap.push_back(*i);
 	}
@@ -683,8 +707,9 @@ void main_game_t::play_tick(float step) {
 		player->pos += move;
 	}
 	// move all monsters
-	const float attack_overlap = 20;
-	const rect_t player_rect(player->effective_rect().shrink(glm::vec2(attack_overlap,0)));
+	const rect_t player_defend(player->defend_rect()),
+		player_attack(player->attack_rect());
+	player->defending = false;
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
 		if((*i)->artwork.cls == artwork_t::CLS_MONSTER) {
 			object_t& monster = **i;
@@ -695,8 +720,11 @@ void main_game_t::play_tick(float step) {
 					std::cout << "monster " << monster.artwork.id << " activated" << std::endl;
 				}
 			} else {
+				const rect_t monster_defend(monster.defend_rect()),
+					monster_attack(monster.attack_rect());
 				bool run = false;
 				monster.attacking = false;
+				monster.defending = false;
 				if(monster.pos.x < player->pos.x) {
 					run = true;
 					monster.dir[monster.state] = object_t::RIGHT;
@@ -704,12 +732,12 @@ void main_game_t::play_tick(float step) {
 					run = true;
 					monster.dir[monster.state] = object_t::LEFT;
 				}
-				if(monster.effective_rect().shrink(glm::vec2(attack_overlap,0)).intersects(player_rect)) {
+				if(monster_attack.intersects(player_defend)) {
 					run = false;
 					monster.attacking = true;
 					monster.set_action(monster.state,"attack");
+					player->defending = true;
 					player->health_points -= monster.artwork.attack_points * step;
-					std::cout << "monster " << monster.artwork.id << " hit you, " << player->health_points << std::endl;
 				} else if(run) {
 					monster.set_action(monster.state,"run");
 					const float speed = monster.active_artwork[monster.state]->speed;
@@ -717,14 +745,13 @@ void main_game_t::play_tick(float step) {
 					monster.pos = move;
 				} else
 					monster.set_action(monster.state,"idle");
-				if(monster.attacking && player->attacking &&
-					((player->pos.x > monster.pos.x) == (player->dir[object_t::WALKING] == object_t::LEFT))) {
+				if(player->attacking &&
+					((player->pos.x > monster.pos.x) == (player->dir[object_t::WALKING] == object_t::LEFT)) &&
+					player_attack.intersects(monster_defend)) {
+					monster.defending = true;
 					monster.health_points -= player->artwork.attack_points * step;
-					std::cout << "you hit monster " << monster.artwork.id << ", " << monster.health_points << std::endl;
-					if(monster.is_dead()) {
-						std::cout << "monster " << monster.artwork.id << " dies" << std::endl;
+					if(monster.is_dead())
 						monster.set_action(player->state,"die");
-					}
 				}
 			}
 		}
@@ -748,6 +775,7 @@ void main_game_t::save() {
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
 		xml << "\t\t<object asset=\"" << (*i)->artwork.id << "\" x=\"" << (*i)->pos.x << "\" y=\"" << (*i)->pos.y << "\"/>\n";
 	for(hots_t::iterator i=hots.begin(); i!=hots.end(); i++) {
+		if(i->type == hot_t::SPECIAL) continue; // not in the xml
 		xml << "\t\t<hot x1=\"" << i->bl.x << "\" y1=\"" << i->bl.y << "\" x2=\"" << i->tr.x << "\" y2=\"" << i->tr.y << "\" type=\"";
 		if(i->type == hot_t::STOP) xml << "stop";
 		else data_error(i->type);
