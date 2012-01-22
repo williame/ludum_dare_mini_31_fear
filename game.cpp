@@ -103,27 +103,28 @@ struct main_game_t::artwork_t {
 	const class_t cls;
 	const glm::mat4 tx;
 	const glm::vec4 anchor;
-	const float scale_factor, speed;
+	const float scale_factor, speed, animation_length;
 	virtual void draw(float time,const glm::mat4& projection,const glm::mat4& modelview,const glm::vec3& light0,const glm::vec4& colour = glm::vec4(1,1,1,1)) = 0;
 	virtual artwork_t* get_child(const std::string& id) = 0;
 	virtual void bounds(glm::vec3& min,glm::vec3& max) = 0;
 	virtual void save(std::stringstream& xml) = 0;
 	virtual bool is_ready() = 0;
+	float effective_animation_length() const { return animation_length? animation_length: 2; }
 protected:
 	void on_ready(bool ok) {
 		if(!ok) data_error("failed to load " << id);
 		game.on_ready(this);
 	}
-	artwork_t(main_game_t& g,const std::string& id_,const std::string& n,class_t c,float sf,const glm::vec3& a,float sp):
+	artwork_t(main_game_t& g,const std::string& id_,const std::string& n,class_t c,float sf,const glm::vec3& a,float sp,float al):
 		game(g), id(id_), name(n), cls(c),
 		tx(glm::scale(glm::vec3(sf,sf,sf))),
 		anchor(glm::scale(glm::vec3(sf,sf,sf))*glm::vec4(a,1)),
-		scale_factor(sf), speed(sp) {}
+		scale_factor(sf), speed(sp), animation_length(al) {}
 };
 
 struct artwork_set_t: public main_game_t::artwork_t {
-	artwork_set_t(main_game_t& main,const std::string& id_,class_t c,float sf,float sp,const glm::vec3& a):
-		artwork_t(main,id_,id_,c,sf,a,sp) {}
+	artwork_set_t(main_game_t& main,const std::string& id_,class_t c,float sf,float sp,const glm::vec3& a,float al):
+		artwork_t(main,id_,id_,c,sf,a,sp,al) {}
 	~artwork_set_t() {
 		for(artworks_t::iterator i=artwork.begin(); i!=artwork.end(); i++)
 			delete *i;
@@ -131,7 +132,7 @@ struct artwork_set_t: public main_game_t::artwork_t {
 	typedef std::vector<artwork_t*> artworks_t;
 	artworks_t artwork;
 	artwork_t* get_child(const std::string& id) {
-		artworks_t match;
+		artworks_t match; // no coffee-fueled reservoir sampling
 		for(artworks_t::iterator i=artwork.begin(); i!=artwork.end(); i++)
 			if((*i)->id == id)
 				match.push_back(*i);
@@ -182,11 +183,9 @@ struct artwork_set_t: public main_game_t::artwork_t {
 
 struct artwork_g3d_t: public main_game_t::artwork_t, private g3d_t::loaded_t {
 	artwork_g3d_t(main_game_t& main,const std::string& id_,const std::string& p,class_t c,float sf,float sp,const glm::vec3& a,float al):
-		artwork_t(main,id_,p,c,sf,a,sp),
-		path(p), animation_length(al),
-		g3d(main,p,this), _ready(false) {}
+		artwork_t(main,id_,p,c,sf,a,sp,al),
+		path(p), g3d(main,p,this), _ready(false) {}
 	const std::string path;
-	const float animation_length;
 	g3d_t g3d;
 	void on_g3d_loaded(g3d_t& g3d,bool ok,intptr_t data) {
 		if(!ok) data_error("failed to load " << path);
@@ -237,13 +236,13 @@ main_game_t::artwork_t* main_game_t::load_asset(xml_walker_t& xml,float sf,float
 		xml.has_key("anchor_z")? xml.value_float("anchor_z"):0);
 	const float scaler = (xml.has_key("scale_factor")? xml.value_float("scale_factor"):1.0)*sf;
 	const float speed = (xml.has_key("speed")? xml.value_float("speed"):0) * sp;
+	const float animation_length = xml.has_key("animation_length")? xml.value_float("animation_length"): 0;
 	if(type == "g3d") {
 		const std::string path = xml.value_string("path");
-		const float animation_length = xml.has_key("animation_length")? xml.value_float("animation_length"): 0;
 		std::cout << "loading G3D " << path << std::endl;
 		return new artwork_g3d_t(*this,id,path,cls,scaler,speed,anchor,animation_length);
 	} else if(type == "set") {
-		artwork_set_t* set = new artwork_set_t(*this,id,cls,scaler,speed,anchor);
+		artwork_set_t* set = new artwork_set_t(*this,id,cls,scaler,speed,anchor,animation_length);
 		for(int i=0; xml.get_child("asset",i); i++, xml.up())
 			set->artwork.push_back(load_asset(xml,scaler,speed));
 		return set;
@@ -280,11 +279,20 @@ struct main_game_t::object_t {
 		if(action == this->action[state]) return;
 		this->action[state] = action;
 		active_artwork[state] = artwork.get_child(action);
+		animation_start[state] = artwork.game.now_secs();
 	}
 	void set_state(state_t state) {
 		if(state == this->state) return;
 		this->state = state;
 		animation_start[state] = artwork.game.now_secs();
+	}
+	void draw(float time,const glm::mat4& projection,const glm::vec3& light0,const glm::vec4& colour = glm::vec4(1,1,1,1)) {
+		time -= animation_start[state];
+		if(time > active_artwork[state]->effective_animation_length()) { // time to change it then
+			active_artwork[state] = artwork.get_child(action[state]);
+			animation_start[state] = artwork.game.now_secs();
+		}
+		active_artwork[state]->draw(time,projection,tx(),light0,colour);		
 	}
 	glm::mat4 tx() {
 		glm::mat4 tx(glm::translate(glm::vec3(pos,-artwork.cls))*artwork.tx);
@@ -407,7 +415,7 @@ bool main_game_t::tick() {
 	const glm::vec3 light0(10,10,10);
 	// show all the objects
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
-		(*i)->active_artwork[(*i)->state]->draw(now-(*i)->animation_start[(*i)->state],projection,(*i)->tx(),light0);
+		(*i)->draw(now,projection,light0);
 	if(mode != MODE_PLAY) {
 		// show active model on top for editing
 		if((mode == MODE_PLACE_OBJECT) && active_model && mouse_down) {
@@ -445,13 +453,16 @@ void main_game_t::play_tick(float step) {
 				player->set_state(object_t::WALKING);
 				if(keys()[KEY_UP]) // still pressed? jump again
 					on_key_down(KEY_UP);
-				else
-					player->set_action(player->state,player->speed[player->state]?"run":"idle");
 			} else
 				move.y = jump_up;
-		} else {
-			assert(player->state == object_t::WALKING);
-			player->set_action(player->state,move.x?"run":"idle");
+		}
+		if(player->state == object_t::WALKING) {
+			if(player->speed[player->state])
+				player->set_action(player->state,"run");
+			else if(keys()[' ']) // attacking?
+				player->set_action(player->state,"attack");
+			else
+				player->set_action(player->state,"idle");
 			move.y = floor_y-player_pos.y;
 		}
 	} else // else path says stop; play a bump sound?
@@ -538,7 +549,7 @@ bool main_game_t::on_key_down(short code) {
 				player->dir[object_t::JUMPING] = player->dir[object_t::WALKING];
 				player->speed[object_t::JUMPING] = player->speed[object_t::WALKING];
 				player->set_state(object_t::JUMPING);
-				player->set_action(player->state,"jump");
+				player->set_action(player->state,keys()[' ']?"jump_attack":"jump");
 			}
 			break;
 		case KEY_LEFT:
@@ -552,6 +563,16 @@ bool main_game_t::on_key_down(short code) {
 			player->set_action(object_t::WALKING,"run");
 			player->speed[object_t::WALKING] = player->active_artwork[object_t::WALKING]->speed;
 			player->dir[object_t::WALKING] = object_t::RIGHT;
+			break;
+		case ' ':
+			if(player->state == object_t::JUMPING) {
+				player->set_action(object_t::JUMPING,"jump_attack");
+			} else {
+				assert(player->state == object_t::WALKING);
+				if(player->speed[object_t::WALKING] == 0) { // no attack whilst running
+					player->set_action(object_t::WALKING,"attack");
+				}
+			}
 			break;
 		default:;
 		}

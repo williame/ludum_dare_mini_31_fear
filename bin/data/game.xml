@@ -25,12 +25,12 @@
 		<asset id="p01" class="player" type="set" scale_factor="50" speed="1">
 			<asset id="run" class="player" type="g3d" path="data/girl run v3.G3D" speed="250" animation_length="0.7"/>
 			<asset id="jump" class="player" type="g3d" path="data/girl jump.G3D" speed="150" animation_length="2"/>
-			<asset id="attack" class="player" type="g3d" path="data/girl attack.G3D" />
-			<asset id="attack" class="player" type="g3d" path="data/girl attack v2.G3D" />
+			<asset id="attack" class="player" type="g3d" path="data/girl attack.G3D" animation_length="0.7"/>
+			<asset id="attack" class="player" type="g3d" path="data/girl attack v2.G3D" animation_length="0.7"/>
+			<asset id="jump_attack" class="player" type="g3d" path="data/girl jump attack.G3D" speed="150" animation_length="0.7"/>
 			<asset id="climb" class="player" type="g3d" path="data/girl climb.G3D" />
-			<asset id="die" class="player" type="g3d" path="data/girldie.G3D" />
-			<asset id="jump_attack" class="player" type="g3d" path="data/girl jump attack.G3D" />
 			<asset id="pickaxe" class="player" type="g3d" path="data/girl pickaxe.G3D"/>
+			<asset id="die" class="player" type="g3d" path="data/girldie.G3D" />
 			<asset id="run" class="player" type="g3d" path="data/girl rum v2.G3D" speed="250" animation_length="0.7"/>
 			<asset id="run" class="player" type="g3d" path="data/girl run.G3D" speed="250" animation_length="0.7"/>
 			<asset id="stop" class="player" type="g3d" path="data/girl run to stand.G3D" />
