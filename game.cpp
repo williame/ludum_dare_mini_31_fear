@@ -62,7 +62,7 @@ private:
 	object_t* active_object;
 	glm::vec2 pan_rate, active_object_anchor;
 	object_t* player;
-	glm::vec2 player_centre;
+	glm::vec2 screen_bl, screen_tr;
 	struct hot_t {
 		hot_t(): type(BAD) {}
 		glm::vec2 a, b;
@@ -253,12 +253,20 @@ main_game_t::artwork_t* main_game_t::load_asset(xml_walker_t& xml,float sf,float
 
 struct main_game_t::object_t {
 	object_t(artwork_t& a,const glm::vec2& p):
-		artwork(a), pos(p), state(WALKING), attacking(false) {
+		artwork(a), pos(p), state(WALKING), attacking(false), waiting(true) {
 			dir[WALKING] = dir[JUMPING] = EDITOR;
 			action[WALKING] = action[JUMPING] = "idle";
 			active_artwork[WALKING] = active_artwork[JUMPING] = artwork.get_child("idle");
 			speed[WALKING] = speed[JUMPING] = 0;
 			animation_start[WALKING] = animation_start[JUMPING] = artwork.game.now_secs();
+			glm::vec3 min, max;
+			artwork.bounds(min,max);
+			const glm::vec4 sz = artwork.tx*glm::vec4(max-min,1.),
+				mn = artwork.tx*glm::vec4(min,1.),
+				mx = artwork.tx*glm::vec4(max,1.);
+			bl = glm::vec2(mn.x,mn.y);
+			tr = glm::vec2(mx.x,mx.y);
+			centre = glm::vec2(sz.x/2,sz.y/2);
 		}
 	artwork_t& artwork;
 	glm::vec2 pos;
@@ -273,10 +281,12 @@ struct main_game_t::object_t {
 		RIGHT = 1
 	} dir[STATE_LAST];
 	bool attacking;
+	bool waiting;
 	double jump_gravity, jump_energy;
 	artwork_t* active_artwork[STATE_LAST];
 	double animation_start[STATE_LAST], speed[STATE_LAST];
 	std::string action[STATE_LAST];
+	glm::vec2 bl, tr, centre;
 	void set_action(state_t state,const std::string& action) {
 		if(action == this->action[state]) return;
 		this->action[state] = action;
@@ -303,6 +313,10 @@ struct main_game_t::object_t {
 		else if(dir[WALKING] == RIGHT)
 			tx *= glm::rotate(90.0f,glm::vec3(0,1,0));
 		return tx;
+	}
+	bool is_visible(const glm::vec2& bl,const glm::vec2& tr) const {
+		return (pos.x+this->bl.x < tr.x && pos.x+this->tr.x > bl.x &&
+			pos.y+this->bl.y < tr.y && pos.y+this->tr.y > bl.y);
 	}
 };
 
@@ -407,17 +421,20 @@ bool main_game_t::tick() {
 		since_last = now-last_tick;
 	if(mode == MODE_PLAY) {
 		play_tick(since_last);
-		screen_centre = player->pos + player_centre;
+		screen_centre = player->pos + player->centre;
 	} else
 		screen_centre += pan_rate * glm::vec2(since_last,since_last);
+	screen_bl = glm::vec2(screen_centre.x-width/2,screen_centre.y-height/2);
+	screen_tr = glm::vec2(screen_centre.x+width/2,screen_centre.y+height/2);
 	const glm::mat4 projection(glm::ortho<float>(
-		screen_centre.x-width/2,screen_centre.x+width/2, // 0,0 is screen centre
-		screen_centre.y-height/2,screen_centre.y+height/2, // y increases upwards
+		screen_bl.x,screen_tr.x, // 0,0 is screen centre
+		screen_bl.y,screen_tr.y, // y increases upwards
 		1,300));
 	const glm::vec3 light0(10,10,10);
 	// show all the objects
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
-		(*i)->draw(now,projection,light0);
+		if((*i)->is_visible(screen_bl,screen_tr))
+			(*i)->draw(now,projection,light0);
 	if(mode != MODE_PLAY) {
 		// show active model on top for editing
 		if((mode == MODE_PLACE_OBJECT) && active_model && mouse_down) {
@@ -486,17 +503,22 @@ void main_game_t::play_tick(float step) {
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
 		if((*i)->artwork.cls == artwork_t::CLS_MONSTER) {
 			object_t& monster = **i;
-			if(monster.pos.x < player->pos.x) {
-				monster.set_action(monster.state,"run");
-				monster.dir[monster.state] = object_t::RIGHT;
-			} else if(monster.pos.x > player->pos.x) {
-				monster.set_action(monster.state,"run");
-				monster.dir[monster.state] = object_t::LEFT;
-			} else
-				monster.set_action(monster.state,"idle");
-			const float speed = monster.active_artwork[monster.state]->speed;
-			glm::vec2 move = floor->route(monster.pos,speed*step,player->pos,true);
-			monster.pos = move;
+			if(monster.waiting) {
+				// if you haven't seen the monster, it stays put
+				monster.waiting = !monster.is_visible(screen_bl,screen_tr);
+			} else {
+				if(monster.pos.x < player->pos.x) {
+					monster.set_action(monster.state,"run");
+					monster.dir[monster.state] = object_t::RIGHT;
+				} else if(monster.pos.x > player->pos.x) {
+					monster.set_action(monster.state,"run");
+					monster.dir[monster.state] = object_t::LEFT;
+				} else
+					monster.set_action(monster.state,"idle");
+				const float speed = monster.active_artwork[monster.state]->speed;
+				glm::vec2 move = floor->route(monster.pos,speed*step,player->pos,true);
+				monster.pos = move;
+			}
 		}
 }
 
@@ -558,10 +580,6 @@ void main_game_t::play() {
 	}
 	mode = MODE_PLAY;
 	pan_rate = glm::vec2(0,0);
-	glm::vec3 min, max;
-	player->artwork.bounds(min,max);
-	glm::vec4 sz = player->artwork.tx*glm::vec4(max-min,1.);
-	player_centre = glm::vec2(sz.x/2,sz.y/2);
 	glClearColor(0,0,0,1);
 	std::cout << "Playing game!" << std::endl;
 }
