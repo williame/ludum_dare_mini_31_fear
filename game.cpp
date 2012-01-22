@@ -46,6 +46,7 @@ private:
 		MODE_EDIT_OBJECT,
 		MODE_FLOOR,
 		MODE_CEILING,
+		MODE_HOT,
 		MODE_PLAY
 	} mode;
 	xml_parser_t game_xml;
@@ -60,6 +61,26 @@ private:
 	object_t* active_object;
 	glm::vec2 pan_rate, active_object_anchor;
 	object_t* player;
+	struct hot_t {
+		glm::vec2 a, b;
+		enum {
+			STOP,
+		} type;
+		void draw(main_t& main,const glm::mat4& mvp,glm::vec4 colour);
+		void normalise() {
+			const float minx(std::min(a.x,b.x)), miny(std::min(a.y,b.y)),
+				maxx(std::max(a.x,b.x)), maxy(std::max(a.y,b.y));
+			a = glm::vec2(minx,miny);
+			b = glm::vec2(maxx,maxy);
+		}
+		bool contains(const glm::vec2& p) const {
+			return (p.x >= a.x && p.y >= a.y && p.x < b.x && p.y < b.y);
+		}
+	};
+	typedef std::vector<hot_t> hots_t;
+	hots_t hots;
+	hot_t hot;
+	bool draw_hot;
 	bool mouse_down;
 	float mouse_x, mouse_y;
 	static const float PAN_RATE;
@@ -115,6 +136,31 @@ struct main_game_t::object_t {
 		return tx;
 	}
 };
+
+void main_game_t::hot_t::draw(main_t& main,const glm::mat4& mvp,glm::vec4 colour) {
+	const GLfloat data[4*2] = {
+		a.x,a.y,
+		b.x,a.y,
+		b.x,b.y,
+		a.x,b.y};
+	GLuint program = main.get_shared_program("path_t"),
+		uniform_mvp_matrix = main.get_uniform_loc(program,"MVP_MATRIX",GL_FLOAT_MAT4),
+		uniform_colour = main.get_uniform_loc(program,"COLOUR",GL_FLOAT_VEC4),
+		attrib_vertex = main.get_attribute_loc(program,"VERTEX",GL_FLOAT_VEC2),
+		vbo;
+	glUseProgram(program);
+	glUniform4fv(uniform_colour,1,glm::value_ptr(colour));
+	glUniformMatrix4fv(uniform_mvp_matrix,1,false,glm::value_ptr(mvp));
+	glEnableVertexAttribArray(attrib_vertex);
+	glCheck();
+	glGenBuffers(1,&vbo);
+	glBindBuffer(GL_ARRAY_BUFFER,vbo);
+	glBufferData(GL_ARRAY_BUFFER,sizeof(data),data,GL_STATIC_DRAW);
+	glLineWidth(2.);
+	glVertexAttribPointer(attrib_vertex,2,GL_FLOAT,GL_FALSE,0,0);
+	glDrawArrays(GL_LINE_LOOP,0,4);
+	glDeleteBuffers(1,&vbo);
+}
 
 void main_game_t::init() {
 	create_shaders(*this);
@@ -182,6 +228,18 @@ void main_game_t::on_ready(artwork_t*) {
 				data_error("unresolved asset ID " << asset);
 			objects.push_back(new object_t(*artwork[asset],glm::vec2(x,y)));
 		}
+		for(int i=0; xml.get_child("hot",i); i++, xml.up()) {
+			hot_t hot;
+			hot.a.x = xml.value_float("x1");
+			hot.a.y = xml.value_float("y1");
+			hot.b.x = xml.value_float("x2");
+			hot.b.y = xml.value_float("y2");
+			hot.normalise();
+			const std::string type = xml.value_string("type");
+			if(type == "stop") hot.type = hot_t::STOP;
+			else data_error("unsupported hot type " << type);
+			hots.push_back(hot);
+		}
 		xml.get_child("floor");
 		floor.reset(new path_t(*this));
 		floor->load(xml);
@@ -223,6 +281,10 @@ bool main_game_t::tick() {
 					active_model->tx,
 				light0,glm::vec4(1,.6,.6,.6));
 		}
+		if((mode == MODE_HOT) && draw_hot)
+			hot.draw(*this,projection,glm::vec4(1,1,0,1));
+		for(hots_t::iterator i=hots.begin(); i!=hots.end(); i++)
+			i->draw(*this,projection,glm::vec4(0,1,0,1));
 	}
 	// floor and ceiling ## hide for production	
 	if(floor.get())
@@ -256,12 +318,17 @@ void main_game_t::play_tick(float step) {
 			else if(floor_y < player_pos.y)
 				move.y = std::min(floor_y,step);
 		}
-	} else {
-		std::cerr << "LEVEL ERROR: player falls off world!" << std::endl;
-		mode = MODE_FLOOR;
-		glClearColor(1,1,1,1);
-		return;
-	}
+	} else // else path says stop; play a bump sound?
+		move.x = 0;
+	glm::vec2 new_pos = player->pos + move;
+	for(hots_t::iterator i=hots.begin(); i!=hots.end(); i++)
+		if(i->contains(new_pos))
+			switch(i->type) {
+			case hot_t::STOP:
+				move.x = 0; // stop lateral movement in that direction
+				break;
+			default:;
+			}
 	player->pos += move;
 }
 
@@ -293,7 +360,13 @@ void main_game_t::save() {
 	}
 	xml << "\t</artwork>\n\t<level>\n";
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
-		xml << "\t\t<object asset=\"" << (*i)->artwork.id << "\" x=\"" << (*i)->pos.x << "\" y=\"" << (*i)->pos.y << "\"/>\n"; 
+		xml << "\t\t<object asset=\"" << (*i)->artwork.id << "\" x=\"" << (*i)->pos.x << "\" y=\"" << (*i)->pos.y << "\"/>\n";
+	for(hots_t::iterator i=hots.begin(); i!=hots.end(); i++) {
+		xml << "\t\t<hot x1=\"" << i->a.x << "\" y1=\"" << i->a.y << "\" x2=\"" << i->b.x << "\" y2=\"" << i->b.y << "\" type=\"";
+		if(i->type == hot_t::STOP) xml << "stop";
+		else data_error(i->type);
+		xml << "\"/>\n";
+	}
 	xml << "\t\t<floor>\n";
 	floor->save(xml);
 	xml << "\t\t</floor>\n\t\t<ceiling>\n";
@@ -361,6 +434,7 @@ bool main_game_t::on_key_down(short code,const input_key_map_t& map,const input_
 	case KEY_RIGHT: pan_rate.x = PAN_RATE; return true;
 	case KEY_UP: pan_rate.y = PAN_RATE; return true;
 	case KEY_DOWN: pan_rate.y = -PAN_RATE; return true;
+	case 'h': mode = MODE_HOT; draw_hot = false; std::cout << "HOT ZONE MODE" << std::endl; return true;
 	case 'f': mode = MODE_FLOOR; std::cout << "FLOOR MODE" << std::endl; return true;
 	case 'c': mode = MODE_CEILING; std::cout << "CEILING MODE" << std::endl; return true;
 	case 'e': 
@@ -438,6 +512,20 @@ bool main_game_t::on_key_up(short code,const input_key_map_t& map,const input_mo
 			return floor->on_key_up(code,map,mouse);
 		case MODE_CEILING:
 			return ceiling->on_key_up(code,map,mouse);
+		case MODE_HOT:
+			if(mouse_down || !draw_hot) return false;
+			switch(code) {
+			case 'x':
+				hot.type = hot_t::STOP;
+				std::cout << "HOT is STOP" << std::endl;
+				break;
+			default:
+				return false;
+			} 
+			hot.normalise();
+			hots.push_back(hot);
+			draw_hot = false;
+			return true;
 		default: return false;
 		}
 	}
@@ -483,6 +571,12 @@ bool main_game_t::on_mouse_down(int x,int y,mouse_button_t button,const input_ke
 		break;
 	case MODE_CEILING:
 		ceiling->on_mouse_down(mapped_x,mapped_y,button,map,mouse);
+		break;
+	case MODE_HOT:
+		if(!draw_hot)
+			hot.a = glm::vec2(mapped_x,mapped_y);
+		draw_hot = true;
+		hot.b = glm::vec2(mapped_x,mapped_y);
 		break;
 	default:;
 	}

@@ -37,6 +37,7 @@
 		<object asset="p01" x="31" y="-79"/>
 		<object asset="m02" x="571" y="-72"/>
 		<object asset="b13" x="2282" y="-173"/>
+		<hot x1="1753" y1="499" x2="1978" y2="-43" type="stop"/>
 		<floor>
 			<node id="0" x="-690" y="-82"/>
 			<node id="1" x="962" y="-77"/>
