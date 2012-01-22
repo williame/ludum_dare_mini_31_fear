@@ -1,9 +1,35 @@
 <game>
 	<artwork>
+		<asset id="BALROG" type="set" class="monster"  scale_factor="40" attack_points="10" health_points="2.5e+06" attack_range="20" defend_range="10">
+			<asset id="pitfall" type="g3d" class="monster" path="data/ballrog pitfall.G3D"/>
+			<asset id="attack" type="g3d" class="monster" path="data/balrog attack.G3D"/>
+			<asset id="idle" type="g3d" class="monster" path="data/balrog fireball idle.G3D"/>
+			<asset id="idle" type="g3d" class="monster" path="data/balrog idle.G3D"/>
+			<asset id="start" type="g3d" class="monster" path="data/balrog idle to walk.G3D"/>
+			<asset id="run" type="g3d" class="monster" path="data/balrog walk.G3D" speed="20" animation_length="3.5"/>
+			<asset id="stop" type="g3d" class="monster" path="data/balrog walk to idle.G3D"/>
+		</asset>
 		<asset id="LOSE" type="splash" class="front" path="data/lose.jpg"/>
+		<asset id="PICKAXE" type="g3d" class="special" path="data/pick/pickaxe.G3D" scale_factor="30"/>
+		<asset id="PLAYER" type="set" class="player"  scale_factor="50" attack_points="10" health_points="100" attack_range="25" defend_range="-10">
+			<asset id="run" type="g3d" class="player" path="data/girl run v3.G3D" speed="250" animation_length="0.7"/>
+			<asset id="jump" type="g3d" class="player" path="data/girl jump.G3D" speed="150" animation_length="2"/>
+			<asset id="attack" type="g3d" class="player" path="data/girl attack.G3D" animation_length="0.7"/>
+			<asset id="attack" type="g3d" class="player" path="data/girl attack v2.G3D" animation_length="0.7"/>
+			<asset id="jump_attack" type="g3d" class="player" path="data/girl jump attack.G3D" speed="150" animation_length="0.7"/>
+			<asset id="climb" type="g3d" class="player" path="data/girl climb.G3D"/>
+			<asset id="pickaxe" type="g3d" class="player" path="data/girl pickaxe.G3D"/>
+			<asset id="die" type="g3d" class="player" path="data/girldie.G3D"/>
+			<asset id="run" type="g3d" class="player" path="data/girl rum v2.G3D" speed="250" animation_length="0.7"/>
+			<asset id="run" type="g3d" class="player" path="data/girl run.G3D" speed="250" animation_length="0.7"/>
+			<asset id="stop" type="g3d" class="player" path="data/girl run to stand.G3D"/>
+			<asset id="idle" type="g3d" class="player" path="data/girlstand1.G3D"/>
+			<asset id="idle" type="g3d" class="player" path="data/girlstand2.G3D"/>
+			<asset id="start" type="g3d" class="player" path="data/girl stand to run.G3D"/>
+		</asset>
 		<asset id="SPLASH" type="splash" class="front" path="data/splash.jpg"/>
-		<asset id="WIN" type="splash" class="front" path="data/win.jpg"/>
 		<asset id="SPLAT" type="splash" class="front" path="data/splatdeath.png"/>
+		<asset id="WIN" type="splash" class="front" path="data/win.jpg"/>
 		<asset id="b01" type="g3d" class="back" path="data/tunnel_back1.g3d" scale_factor="30"/>
 		<asset id="b02" type="g3d" class="back" path="data/tunnel_back2.g3d" scale_factor="30"/>
 		<asset id="b03" type="g3d" class="back" path="data/tunnel_back3.g3d" scale_factor="30"/>
@@ -19,41 +45,15 @@
 		<asset id="b15" type="g3d" class="back" path="data/tunnel_end_left.g3d" scale_factor="30"/>
 		<asset id="b16" type="g3d" class="back" path="data/tunnel_end_right.g3d" scale_factor="30"/>
 		<asset id="b17" type="g3d" class="back" path="data/tunnel_updown2.g3d" scale_factor="30"/>
-		<asset id="balrog1" type="set" class="monster"  scale_factor="30" attack_points="10" health_points="2.5e+06" attack_range="20" defend_range="10">
-			<asset id="pitfall" type="g3d" class="monster" path="data/ballrog pitfall.G3D"/>
-			<asset id="attack" type="g3d" class="monster" path="data/balrog attack.G3D"/>
-			<asset id="idle" type="g3d" class="monster" path="data/balrog fireball idle.G3D"/>
-			<asset id="idle" type="g3d" class="monster" path="data/balrog idle.G3D"/>
-			<asset id="start" type="g3d" class="monster" path="data/balrog idle to walk.G3D"/>
-			<asset id="run" type="g3d" class="monster" path="data/balrog walk.G3D" speed="20"/>
-			<asset id="stop" type="g3d" class="monster" path="data/balrog walk to idle.G3D"/>
-		</asset>
 		<asset id="bat1" type="set" class="monster"  scale_factor="60" attack_points="5" health_points="5" attack_range="-15" defend_range="-10" anchor_y="-100" anchor_z="20">
 			<asset id="run" type="g3d" class="monster" path="data/bat_fly.g3d" speed="80"/>
 			<asset id="idle" type="g3d" class="monster" path="data/bat_hang.g3d"/>
 			<asset id="die" type="g3d" class="monster" path="data/bat_die.g3d"/>
 		</asset>
-		<asset id="chasm1" type="set" class="back"  scale_factor="30">
+		<asset id="CHASM" type="set" class="back"  scale_factor="30">
 			<asset id="collapse_boss" type="g3d" class="back" path="data/tunnel_chasm_collapse_wboss.g3d"/>
 			<asset id="idle" type="g3d" class="back" path="data/tunnel_chasm.g3d"/>
 			<asset id="collapse" type="g3d" class="back" path="data/tunnel_chasm_collapse.g3d"/>
-		</asset>
-		<asset id="pickaxe1" type="g3d" class="special" path="data/pick/pickaxe.G3D" scale_factor="30"/>
-		<asset id="player1" type="set" class="player"  scale_factor="50" attack_points="10" health_points="30" attack_range="25" defend_range="-10">
-			<asset id="run" type="g3d" class="player" path="data/girl run v3.G3D" speed="250" animation_length="0.7"/>
-			<asset id="jump" type="g3d" class="player" path="data/girl jump.G3D" speed="150" animation_length="2"/>
-			<asset id="attack" type="g3d" class="player" path="data/girl attack.G3D" animation_length="0.7"/>
-			<asset id="attack" type="g3d" class="player" path="data/girl attack v2.G3D" animation_length="0.7"/>
-			<asset id="jump_attack" type="g3d" class="player" path="data/girl jump attack.G3D" speed="150" animation_length="0.7"/>
-			<asset id="climb" type="g3d" class="player" path="data/girl climb.G3D"/>
-			<asset id="pickaxe" type="g3d" class="player" path="data/girl pickaxe.G3D"/>
-			<asset id="die" type="g3d" class="player" path="data/girldie.G3D"/>
-			<asset id="run" type="g3d" class="player" path="data/girl rum v2.G3D" speed="250" animation_length="0.7"/>
-			<asset id="run" type="g3d" class="player" path="data/girl run.G3D" speed="250" animation_length="0.7"/>
-			<asset id="stop" type="g3d" class="player" path="data/girl run to stand.G3D"/>
-			<asset id="idle" type="g3d" class="player" path="data/girlstand1.G3D"/>
-			<asset id="idle" type="g3d" class="player" path="data/girlstand2.G3D"/>
-			<asset id="start" type="g3d" class="player" path="data/girl stand to run.G3D"/>
 		</asset>
 		<asset id="spider1" type="set" class="monster"  scale_factor="30" attack_points="10" health_points="20" attack_range="-15" defend_range="-5">
 			<asset id="idle" type="g3d" class="monster" path="data/spider1.g3d"/>
@@ -72,11 +72,11 @@
 		<object asset="b08" x="394" y="18"/>
 		<object asset="b09" x="1041" y="18"/>
 		<object asset="b05" x="1633" y="-173"/>
-		<object asset="balrog1" x="-482" y="-81"/>
-		<object asset="player1" x="31" y="-79"/>
+		<object asset="BALROG" x="-482" y="-81"/>
+		<object asset="PLAYER" x="31" y="-79"/>
 		<object asset="spider1" x="571" y="-72"/>
 		<object asset="bat1" x="571" y="-72"/>
-		<object asset="chasm1" x="2282" y="-173"/>
+		<object asset="CHASM" x="2282" y="-173"/>
 		<object asset="b17" x="1845" y="250"/>
 		<object asset="b10" x="2438" y="307"/>
 		<object asset="b15" x="1198" y="309"/>
@@ -88,7 +88,7 @@
 		<object asset="stal4" x="2344" y="405"/>
 		<object asset="stal4" x="2655" y="403"/>
 		<object asset="stal5" x="1200" y="177"/>
-		<object asset="pickaxe1" x="2824" y="-199"/>
+		<object asset="PICKAXE" x="2824" y="-239"/>
 		<object asset="bat1" x="1102" y="-32"/>
 		<object asset="bat1" x="1438" y="8"/>
 		<object asset="bat1" x="1238" y="238"/>
@@ -108,6 +108,7 @@
 		<hot x1="3079" y1="169" x2="3277" y2="591" type="stop"/>
 		<hot x1="3064" y1="-291" x2="3313" y2="196" type="stop"/>
 		<hot x1="-797" y1="-99" x2="-680" y2="194" type="stop"/>
+		<hot x1="2254" y1="-293" x2="2749" y2="-208" type="bridge"/>
 		<floor>
 			<node id="0" x="-690" y="-82"/>
 			<node id="1" x="962" y="-77"/>

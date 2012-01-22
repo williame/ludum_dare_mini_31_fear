@@ -54,7 +54,7 @@ struct rect_t {
 class main_game_t: public main_t, private main_t::file_io_t {
 public:
 	main_game_t(void* platform_ptr): main_t(platform_ptr),
-		mode(MODE_LOAD), active_model(NULL), active_object(NULL), player(NULL), mouse_down(false) {}
+		mode(MODE_LOAD), active_model(NULL), active_object(NULL), player(NULL), bridge_broken(false), won(false), mouse_down(false) {}
 	void init();
 	bool tick();
 	void on_io(const std::string& name,bool ok,const std::string& bytes,intptr_t data);
@@ -97,12 +97,13 @@ private:
 	objects_t objects;
 	object_t* active_object;
 	glm::vec2 pan_rate, active_object_anchor;
-	object_t* player;
+	object_t* player, *balrog;
 	rect_t screen;
 	struct hot_t: public rect_t {
 		hot_t(): type(BAD) {}
 		enum {
 			STOP,
+			BRIDGE,
 			SPECIAL,
 			BAD
 		} type;
@@ -111,6 +112,7 @@ private:
 	typedef std::vector<hot_t> hots_t;
 	hots_t hots;
 	hot_t new_hot, active_hot;
+	bool bridge_broken, won;
 	bool draw_hot;
 	bool mouse_down;
 	float mouse_x, mouse_y;
@@ -137,6 +139,7 @@ struct main_game_t::artwork_t {
 	const float scale_factor, speed, animation_length;
 	const float attack_points, health_points, attack_range, defend_range;
 	virtual void draw(float time,const glm::mat4& projection,const glm::mat4& modelview,const glm::vec3& light0,const glm::vec4& colour = glm::vec4(1,1,1,1)) = 0;
+	virtual void draw(const rect_t& rect,const glm::mat4& projection,const glm::vec4& colour = glm::vec4(1,1,1,1)) {} // for splash etc
 	virtual artwork_t* get_child(const std::string& id) = 0;
 	virtual void bounds(glm::vec3& min,glm::vec3& max) = 0;
 	rect_t rect() {
@@ -196,10 +199,13 @@ struct artwork_splash_t: public main_game_t::artwork_t, private main_t::texture_
 			data_error("could not load splash " << id << ':' << path);
 	}
 	bool is_ready() { return texture; }
-	void draw(float time,const glm::mat4& projection,const glm::mat4& modelview,const glm::vec3& light0,const glm::vec4& colour = glm::vec4(1,1,1,1)) {
+	void draw(float time,const glm::mat4& projection,const glm::mat4& modelview,const glm::vec3& light0,const glm::vec4& colour) {}
+	void draw(const rect_t& rect,const glm::mat4& projection,const glm::vec4& colour) {
 		if(!is_ready()) return;
+		const glm::vec4 bl = projection * glm::vec4(rect.bl,0,1), tr = projection * glm::vec4(rect.tr,0,1);
+		const float x1 = bl.x, y1 = bl.y, x2 = tr.x, y2 = tr.y;
 		const GLfloat data[4*2+4*2] = {
-			-1,-1,1,-1,-1,1,1,1,
+			x1,y1,x2,y1,x1,y2,x2,y2,
 			0,1,1,1,0,0,1,0};
 		GLuint program = game.get_shared_program("splash"),
 			uniform_colour = game.get_uniform_loc(program,"COLOUR",GL_FLOAT_VEC4),
@@ -421,7 +427,7 @@ main_game_t::artwork_t* main_game_t::load_asset(xml_walker_t& xml,artwork_t* par
 struct main_game_t::object_t {
 	object_t(artwork_t& a,const glm::vec2& p):
 		artwork(a), pos(p), state(WALKING), attacking(false), defending(false), waiting(true),
-		health_points(a.health_points), bury(false) {
+		has_pickaxe(false), health_points(a.health_points), bury(false) {
 			dir[WALKING] = dir[JUMPING] = EDITOR;
 			action[WALKING] = action[JUMPING] = "idle";
 			active_artwork[WALKING] = active_artwork[JUMPING] = artwork.get_child("idle");
@@ -441,7 +447,7 @@ struct main_game_t::object_t {
 		RIGHT = 1
 	} dir[STATE_LAST];
 	bool attacking, defending;
-	bool waiting;
+	bool waiting, has_pickaxe;
 	double jump_gravity, jump_energy;
 	float health_points;
 	artwork_t* active_artwork[STATE_LAST];
@@ -459,6 +465,7 @@ struct main_game_t::object_t {
 		animation_start[state] = artwork.game.now_secs();
 	}
 	void draw(float time,const glm::mat4& projection,const glm::vec3& light0,const glm::vec4& colour = glm::vec4(1,1,1,1)) {
+		if(bury) return;
 		time -= animation_start[state];
 		if(time > active_artwork[state]->effective_animation_length()) { // time to change it then
 			if(is_dead()) {
@@ -586,6 +593,7 @@ void main_game_t::on_ready(artwork_t*) {
 			new_hot.normalise();
 			const std::string type = xml.value_string("type");
 			if(type == "stop") new_hot.type = hot_t::STOP;
+			else if(type == "bridge") new_hot.type = hot_t::BRIDGE;
 			else data_error("unsupported hot type " << type);
 			hots.push_back(new_hot);
 		}
@@ -607,11 +615,22 @@ bool main_game_t::tick() {
 	static double last_tick = now_secs();
 	const double now = now_secs(), since_last = now-last_tick;
 	if(mode == MODE_SPLASH) {
-		artwork["SPLASH"]->draw(now,glm::mat4(),glm::mat4(),glm::vec3(),glm::vec4(1,1,1,1));
+		artwork["SPLASH"]->draw(rect_t(glm::vec2(-1,-1),glm::vec2(1,1)),glm::mat4(),glm::vec4(1,1,1,1));
 		return true;
 	} else if(mode == MODE_PLAY) {
+		if(won && balrog->bury) {
+			artwork["WIN"]->draw(rect_t(glm::vec2(-1,-1),glm::vec2(1,1)),glm::mat4(),glm::vec4(1,1,1,1));
+			return true;
+		}
+		if(player->bury) {
+			artwork["LOSE"]->draw(rect_t(glm::vec2(-1,-1),glm::vec2(1,1)),glm::mat4(),glm::vec4(1,1,1,1));
+			return true;
+		}
 		play_tick(since_last);
-		screen_centre = player->pos + player->artwork.rect().centre();
+		if(won)
+			screen_centre = balrog->pos + balrog->artwork.rect().centre();
+		else
+			screen_centre = player->pos + player->artwork.rect().centre();
 	} else
 		screen_centre += pan_rate * glm::vec2(since_last,since_last);
 	screen.bl = glm::vec2(screen_centre.x-width/2,screen_centre.y-height/2);
@@ -621,10 +640,6 @@ bool main_game_t::tick() {
 		screen.bl.y,screen.tr.y, // y increases upwards
 		1,300));
 	const glm::vec3 light0(10,10,10);
-	if(mode == MODE_PLAY && player->is_dead() && player->bury) {
-		artwork_t* lose = artwork["LOSE"];
-		lose->draw(now,projection,lose->tx,light0);
-	}
 	// show all the objects
 	objects_t reap;
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++) {
@@ -634,14 +649,14 @@ bool main_game_t::tick() {
 			(*i)->defend_rect().draw(*this,projection,glm::vec4(1,1,1,.5));
 		if((*i)->attacking)
 			(*i)->attack_rect().draw(*this,projection,glm::vec4(1,0,0,.5));
-		if((mode == MODE_PLAY) && (*i)->is_dead() && (*i)->bury && *i!=player)
+		if((mode == MODE_PLAY) && (*i)->bury && *i!=player)
 			reap.push_back(*i);
 	}
 	for(objects_t::iterator i=reap.begin(); i!=reap.end(); i++) {
 		objects.erase(std::find(objects.begin(),objects.end(),*i));
 		delete *i;
 	}
-	if(mode != MODE_PLAY) {
+	if(true) { //### mode != MODE_PLAY) {
 		// show active model on top for editing
 		if((mode == MODE_PLACE_OBJECT) && active_model && mouse_down) {
 			active_model->draw(now,projection,
@@ -686,7 +701,7 @@ void main_game_t::play_tick(float step) {
 			if(player->state == object_t::WALKING) {
 				player->attacking = !player->speed[player->state] && keys()[' '];
 				if(player->attacking)
-					player->set_action(player->state,"attack");
+					player->set_action(player->state,player->has_pickaxe?"pickaxe":"attack");
 				else if(player->speed[player->state])
 					player->set_action(player->state,"run");
 				else
@@ -699,6 +714,41 @@ void main_game_t::play_tick(float step) {
 		for(hots_t::iterator i=hots.begin(); i!=hots.end(); i++)
 			if(i->contains(new_pos))
 				switch(i->type) {
+				case hot_t::SPECIAL:
+					if(i->special) {
+						if(i->special->artwork.id == "PICKAXE") {
+							i->special->bury = true;
+							player->has_pickaxe = true;
+						} else
+							data_error("unsupported special " << i->special->artwork.id);
+						i->special = NULL; // only trigger once
+					}
+					break;
+				case hot_t::BRIDGE:
+					if(bridge_broken) {
+						std::cout << "BRIDGE is BROKEN so you die" << std::endl;
+						player->health_points = -1;
+					} else if(player->attacking && player->has_pickaxe) {
+						std::cout << "YOU SWING AXE to BREAK BRIDGE" << std::endl;
+						bridge_broken = true;
+						rect_t shrink = i->shrink(glm::vec2(60,0)); // make it so you can survive on the edge
+						i->bl = shrink.bl; i->tr = shrink.tr;
+						bool balrog_dies = false;
+						object_t* chasm = NULL;
+						for(objects_t::iterator o=objects.begin(); o!=objects.end(); o++)
+							if((*o)->artwork.id == "CHASM") {
+								chasm = *o;
+							} else if((*o)->defend_rect().intersects(shrink)) {
+								std::cout << "BRIDGE is BROKEN so " << (*o)->artwork.id << " dies" << std::endl;
+								(*o)->health_points = -1;
+								balrog_dies |= (*o == balrog);
+								(*o)->set_action((*o)->state,"pitfall");
+							}
+						chasm->set_action(chasm->state,balrog_dies?"collapse_boss":"collapse");
+						won = balrog_dies && !player->is_dead();
+						return;
+					}
+					break;
 				case hot_t::STOP:
 					move.x = 0; // stop lateral movement in that direction
 					break;
@@ -742,6 +792,12 @@ void main_game_t::play_tick(float step) {
 					monster.set_action(monster.state,"run");
 					const float speed = monster.active_artwork[monster.state]->speed;
 					glm::vec2 move = floor->route(monster.pos,speed*step,player->pos,true);
+					for(hots_t::iterator i=hots.begin(); i!=hots.end(); i++)
+						if(bridge_broken && i->type == hot_t::BRIDGE && i->contains(move) &&
+							monster.artwork.id != "bat1") {
+							move.x = 0; // cancel
+							break;
+						}
 					monster.pos = move;
 				} else
 					monster.set_action(monster.state,"idle");
@@ -778,6 +834,7 @@ void main_game_t::save() {
 		if(i->type == hot_t::SPECIAL) continue; // not in the xml
 		xml << "\t\t<hot x1=\"" << i->bl.x << "\" y1=\"" << i->bl.y << "\" x2=\"" << i->tr.x << "\" y2=\"" << i->tr.y << "\" type=\"";
 		if(i->type == hot_t::STOP) xml << "stop";
+		else if(i->type == hot_t::BRIDGE) xml << "bridge";
 		else data_error(i->type);
 		xml << "\"/>\n";
 	}
@@ -798,7 +855,7 @@ void main_game_t::save() {
 
 void main_game_t::play() {
 	// find player object
-	player = NULL;
+	player = balrog = NULL;
 	for(objects_t::iterator o=objects.begin(); o!=objects.end(); o++) {
 		(*o)->set_state(object_t::WALKING);
 		if((*o)->artwork.cls == artwork_t::CLS_PLAYER) {
@@ -808,10 +865,15 @@ void main_game_t::play() {
 				return;
 			} else
 				player = *o;
-		}
+		} else if((*o)->artwork.id == "BALROG")
+			balrog = *o;
 	}
 	if(!player) {
 		std::cerr << "There is no player!  Cannot play." << std::endl;
+		return;
+	}
+	if(!balrog) {
+		std::cerr << "There is no balrog!  Cannot play." << std::endl;
 		return;
 	}
 	if(!player->artwork.get_child("run")->speed) {
@@ -862,7 +924,7 @@ bool main_game_t::on_key_down(short code) {
 				assert(player->state == object_t::WALKING);
 				if(player->speed[object_t::WALKING] == 0) { // no attack whilst running
 					player->attacking = true;
-					player->set_action(object_t::WALKING,"attack");
+					player->set_action(object_t::WALKING,player->has_pickaxe?"pickaxe":"attack");
 				}
 			}
 			break;
@@ -974,6 +1036,10 @@ bool main_game_t::on_key_up(short code) {
 			case 'x':
 				new_hot.type = hot_t::STOP;
 				std::cout << "HOT is STOP" << std::endl;
+				break;
+			case 'b':
+				new_hot.type = hot_t::BRIDGE;
+				std::cout << "HOT is BRIDGE" << std::endl;
 				break;
 			default:
 				return false;
