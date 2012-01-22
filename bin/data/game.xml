@@ -26,6 +26,7 @@
 			<asset id="idle" type="g3d" class="player" path="data/girlstand1.G3D"/>
 			<asset id="idle" type="g3d" class="player" path="data/girlstand2.G3D"/>
 			<asset id="start" type="g3d" class="player" path="data/girl stand to run.G3D"/>
+			<asset id="pitfall" type="g3d" class="player" path="data/girl fall.G3D"/>
 		</asset>
 		<asset id="SPLASH" type="splash" class="front" path="data/splash.jpg"/>
 		<asset id="SPLAT" type="splash" class="front" path="data/splatdeath.png"/>
@@ -47,6 +48,7 @@
 		<asset id="b17" type="g3d" class="back" path="data/tunnel_updown2.g3d" scale_factor="30"/>
 		<asset id="bat1" type="set" class="monster"  scale_factor="60" attack_points="5" health_points="5" attack_range="-15" defend_range="-10" anchor_y="-100" anchor_z="20">
 			<asset id="run" type="g3d" class="monster" path="data/bat_fly.g3d" speed="80"/>
+			<asset id="attack" type="g3d" class="monster" path="data/bat_fly.g3d"/>
 			<asset id="idle" type="g3d" class="monster" path="data/bat_hang.g3d"/>
 			<asset id="die" type="g3d" class="monster" path="data/bat_die.g3d"/>
 		</asset>
@@ -57,8 +59,10 @@
 		</asset>
 		<asset id="spider1" type="set" class="monster"  scale_factor="30" attack_points="10" health_points="20" attack_range="-15" defend_range="-5">
 			<asset id="idle" type="g3d" class="monster" path="data/spider1.g3d"/>
+			<asset id="attack" type="g3d" class="monster" path="data/spider1.g3d"/>
 			<asset id="run" type="g3d" class="monster" path="data/spider_run.g3d" speed="40"/>
 			<asset id="die" type="g3d" class="monster" path="data/spider_die.g3d"/>
+			<asset id="pitfall" type="g3d" class="monster" path="data/spider_die_bridge.g3d"/>
 		</asset>
 		<asset id="stal1" type="g3d" class="monster" path="data/staligtite.g3d" scale_factor="30"/>
 		<asset id="stal2" type="g3d" class="front" path="data/stalacitite/stalacititea.G3D" scale_factor="15"/>

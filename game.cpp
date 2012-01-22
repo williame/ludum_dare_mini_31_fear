@@ -471,6 +471,8 @@ struct main_game_t::object_t {
 			if(is_dead()) {
 				bury = true;
 				return;
+			} else if(action[state] == "collapse") { // bridge
+				set_action(state,"collapsed");
 			} else {
 				active_artwork[state] = artwork.get_child(action[state]);
 				animation_start[state] = artwork.game.now_secs();
@@ -645,11 +647,13 @@ bool main_game_t::tick() {
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++) {
 		if((*i)->is_visible(screen))
 			(*i)->draw(now,projection,light0);
-		if((*i)->defending)
-			(*i)->defend_rect().draw(*this,projection,glm::vec4(1,1,1,.5));
-		if((*i)->attacking)
-			(*i)->attack_rect().draw(*this,projection,glm::vec4(1,0,0,.5));
-		if((mode == MODE_PLAY) && (*i)->bury && *i!=player)
+		if(false) {
+			if((*i)->defending)
+				(*i)->defend_rect().draw(*this,projection,glm::vec4(1,1,1,.5));
+			if((*i)->attacking)
+				(*i)->attack_rect().draw(*this,projection,glm::vec4(1,0,0,.5));
+		}
+		if((mode == MODE_PLAY) && (*i)->bury && *i!=player && *i!=balrog)
 			reap.push_back(*i);
 	}
 	for(objects_t::iterator i=reap.begin(); i!=reap.end(); i++) {
