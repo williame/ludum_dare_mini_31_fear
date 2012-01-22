@@ -32,7 +32,7 @@ bool path_t::y_at(const glm::vec2& p,float& y,bool down) const {
 				fabsf(p.x-b->pos.x)<1?1:
 				(p.x-a->pos.x)/(b->pos.x-a->pos.x);
 			const float pos_y = a->pos.y*(1-mu)+b->pos.y*mu;
-			if(found && (fabs(p.y-y) < fabs(p.y-pos_y)))
+			if(found && (fabs(p.y-y) < fabs(p.y-pos_y))) // design simplifaction; closest is best.
 				continue;
 			y = pos_y;
 			found = true;

@@ -92,7 +92,7 @@ struct main_game_t::artwork_t: public g3d_t, public g3d_t::loaded_t {
 
 struct main_game_t::object_t {
 	object_t(artwork_t& a,const glm::vec2& p):
-		artwork(a), pos(p), dir(IDLE), state(WALKING) {}
+		artwork(a), pos(p), dir(IDLE), state(WALKING), animation_start(a.main.now_secs()) {}
 	artwork_t& artwork;
 	glm::vec2 pos;
 	enum {
@@ -105,6 +105,7 @@ struct main_game_t::object_t {
 		JUMPING,
 	} state;
 	double jump_gravity, jump_energy;
+	double animation_start;
 	glm::mat4 tx() {
 		glm::mat4 tx(glm::translate(glm::vec3(pos,-artwork.cls))*artwork.tx);
 		if(dir == LEFT)
@@ -193,11 +194,10 @@ void main_game_t::on_ready(artwork_t*) {
 }
 
 bool main_game_t::tick() {
-	static uint64_t first_tick = now(), last_tick;
-	const uint64_t now = this->now();
-	const double elapsed = (double)(now-first_tick)/1000000000, // seconds
-		time = fmod(elapsed*.5,1), // cycle every 2 seconds
-		since_last = (double)(now-last_tick)/1000000000;
+	static double first_tick = now_secs(), last_tick;
+	const double now = this->now_secs(),
+		elapsed = now-first_tick,
+		since_last = now-last_tick;
 	if(mode == MODE_PLAY) {
 		play_tick(since_last);
 		screen_centre = player->pos;
@@ -209,12 +209,16 @@ bool main_game_t::tick() {
 		1,300));
 	const glm::vec3 light0(10,10,10);
 	// show all the objects
-	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
-		(*i)->artwork.draw(time,projection,(*i)->tx(),light0);
+	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++) {
+		artwork_t& art = (*i)->artwork;
+		const float anim_len = (art.animation_length>0?art.animation_length:2);
+		const float time = fmod((now-(*i)->animation_start)/anim_len,1);
+		art.draw(time,projection,(*i)->tx(),light0);
+	}
 	if(mode != MODE_PLAY) {
 		// show active model on top for editing
 		if((mode == MODE_PLACE_OBJECT) && active_model && mouse_down) {
-			active_model->draw(time,projection,
+			active_model->draw(fmod(elapsed*.5,1),projection,
 				glm::translate(glm::vec3(screen_centre.x+mouse_x-width/2,screen_centre.y-mouse_y+height/2,-50))*
 					active_model->tx,
 				light0,glm::vec4(1,.6,.6,.6));
