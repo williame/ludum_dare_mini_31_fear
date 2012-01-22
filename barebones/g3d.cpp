@@ -6,7 +6,7 @@ struct g3d_t::mesh_t: private main_t::texture_load_t {
 public:
 	mesh_t(g3d_t& g3d,binary_reader_t& in,char ver);
 	virtual ~mesh_t();
-	void draw(float time,const glm::mat4& projection,const glm::mat4& modelview,const glm::vec3& light_0,const glm::vec4& colour);
+	void draw(float time,const glm::mat4& projection,const glm::mat4& modelview,const glm::vec3& light_0,bool cycles,const glm::vec4& colour);
 	bool is_ready() const { return i_vbo && (!(textures&1) || texture); }
 	g3d_t& g3d;
 	std::string name;
@@ -176,7 +176,7 @@ g3d_t::mesh_t::~mesh_t() {
 }
 
 
-void g3d_t::mesh_t::draw(float time,const glm::mat4& projection,const glm::mat4& modelview,const glm::vec3& light_0,const glm::vec4& colour) {
+void g3d_t::mesh_t::draw(float time,const glm::mat4& projection,const glm::mat4& modelview,const glm::vec3& light_0,bool cycles,const glm::vec4& colour) {
 	if(!i_vbo || ((textures&1) && !texture)) {
 		std::cerr << "cannot draw " << g3d.filename << ':' << name << " because it is not initialized (" << i_vbo << ',' << textures << ',' << texture << ')' << std::endl;
 		return;
@@ -196,8 +196,12 @@ void g3d_t::mesh_t::draw(float time,const glm::mat4& projection,const glm::mat4&
 	glVertexAttribPointer(attrib_normal_0,3,GL_FLOAT,GL_FALSE,stride,(void*)(3*sizeof(GLfloat)));
 	glCheck();
 	if(frame_count > 1) {
-		const size_t frame_1 = (frame_0+1) % frame_count;
-		const float lerp = fmod(time,1);
+		size_t frame_1 = (frame_0+1) % frame_count;
+		float lerp = fmod(time,1);
+		if(!cycles && (frame_1 < frame_0)) {
+			frame_1 = frame_0;
+			lerp = 0;
+		}
 		glUniform1f(uniform_lerp,lerp);
 		glBindBuffer(GL_ARRAY_BUFFER,vn_vbo[frame_1]);	
 		glVertexAttribPointer(attrib_vertex_1,3,GL_FLOAT,GL_FALSE,stride,(void*)(0));
@@ -226,9 +230,9 @@ void g3d_t::mesh_t::on_texture_loaded(const std::string& name,GLuint handle,intp
 	g3d.on_ready(this);
 }
 
-void g3d_t::draw(float time,const glm::mat4& projection,const glm::mat4& modelview,const glm::vec3& light_0,const glm::vec4& colour) {
+void g3d_t::draw(float time,const glm::mat4& projection,const glm::mat4& modelview,const glm::vec3& light_0,bool cycles,const glm::vec4& colour) {
 	for(meshes_t::iterator m=meshes.begin(); m!=meshes.end(); m++)
-		(*m)->draw(time,projection,modelview,light_0,colour);
+		(*m)->draw(time,projection,modelview,light_0,cycles,colour);
 }
 
 void g3d_t::bounds(glm::vec3& min,glm::vec3& max) {

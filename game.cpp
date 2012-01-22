@@ -327,11 +327,12 @@ struct artwork_set_t: public main_game_t::artwork_t {
 };
 
 struct artwork_g3d_t: public main_game_t::artwork_t, private g3d_t::loaded_t {
-	artwork_g3d_t(main_game_t& main,artwork_t* parent,const std::string& id_,const std::string& p,class_t c,float sf,float sp,
+	artwork_g3d_t(main_game_t& main,artwork_t* parent,const std::string& id_,const std::string& p,class_t c,bool cy,float sf,float sp,
 		const glm::vec3& a,float al,float attack_points,float health_points,float attack_range,float defend_range):
 		artwork_t(main,parent,id_,p,c,sf,a,sp,al,attack_points,health_points,attack_range,defend_range),
-		path(p), g3d(main,p,this), _ready(false) {}
+		path(p), cycles(cy), g3d(main,p,this), _ready(false) {}
 	const std::string path;
+	const bool cycles;
 	g3d_t g3d;
 	void on_g3d_loaded(g3d_t& g3d,bool ok,intptr_t data) {
 		if(!ok) data_error("failed to load " << path);
@@ -341,7 +342,7 @@ struct artwork_g3d_t: public main_game_t::artwork_t, private g3d_t::loaded_t {
 	void draw(float time,const glm::mat4& projection,const glm::mat4& modelview,const glm::vec3& light0,const glm::vec4& colour) {
 		const float anim_len = (animation_length>0?animation_length:2);
 		const float t = fmod(time/anim_len,1);
-		g3d.draw(t,projection,modelview,light0,colour);
+		g3d.draw(t,projection,modelview,light0,cycles,colour);
 	}
 	artwork_t* get_child(const std::string& id) { return this; }
 	void bounds(glm::vec3& min,glm::vec3& max) { return g3d.bounds(min,max); }
@@ -357,6 +358,8 @@ struct artwork_g3d_t: public main_game_t::artwork_t, private g3d_t::loaded_t {
 			cls == artwork_t::CLS_MONSTER?"monster":
 				"BUG") <<
 			"\" path=\"" << path << "\"";
+		if(!cycles)
+			xml << " cycles=\"false\"";
 		const float sf = (parent && parent->scale_factor?scale_factor/parent->scale_factor:scale_factor);
 		if(sf !=1)
 			xml << " scale_factor=\"" << sf << "\"";
@@ -411,8 +414,9 @@ main_game_t::artwork_t* main_game_t::load_asset(xml_walker_t& xml,artwork_t* par
 	const float defend_range = xml.has_key("defend_range")? xml.value_float("defend_range"): 0;
 	if(type == "g3d") {
 		const std::string path = xml.value_string("path");
+		const bool cycles = xml.has_key("cycles")? xml.value_bool("cycles"): true;
 		std::cout << "loading G3D " << path << std::endl;
-		return new artwork_g3d_t(*this,parent,id,path,cls,scaler,speed,anchor,animation_length,attack_points,health_points,attack_range,defend_range);
+		return new artwork_g3d_t(*this,parent,id,path,cls,cycles,scaler,speed,anchor,animation_length,attack_points,health_points,attack_range,defend_range);
 	} else if(type == "splash") {
 		const std::string path = xml.value_string("path");
 		std::cout << "loading splash " << path << std::endl;
