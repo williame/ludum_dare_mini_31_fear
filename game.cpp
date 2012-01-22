@@ -7,6 +7,7 @@
 #endif
 
 #include "barebones/main.hpp"
+#include "barebones/rand.hpp"
 #include "barebones/xml.hpp"
 #include "barebones/g3d.hpp"
 #include "external/ogl-math/glm/gtx/transform.hpp"
@@ -57,6 +58,7 @@ public:
 	bool on_key_up(short code);
 	bool on_mouse_down(int x,int y,mouse_button_t button);
 	bool on_mouse_up(int x,int y,mouse_button_t button);
+	rand_t rand;
 	struct artwork_t;
 private:
 	friend struct artwork_t;
@@ -186,7 +188,7 @@ struct artwork_set_t: public main_game_t::artwork_t {
 			if((*i)->id == id)
 				match.push_back(*i);
 		if(match.size()) {
-			const size_t i = random()%match.size();
+			const size_t i = game.rand.rand(match.size());
 			return match.at(i);
 		}
 		std::cout << "set " << this->id << " has no child " << id << std::endl;
