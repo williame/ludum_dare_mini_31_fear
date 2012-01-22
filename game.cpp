@@ -38,7 +38,7 @@ struct rect_t {
 		tr = glm::vec2(maxx,maxy);
 	}
 	rect_t shrink(const glm::vec2& margin) const {
-		rect_t ret(bl+margin,tr+margin);
+		rect_t ret(bl+margin,tr-margin);
 		ret.normalise(); // so we don't care if it turns inside out
 		return ret;
 	}
@@ -114,6 +114,8 @@ struct main_game_t::artwork_t {
 		CLS_BACK = 150,
 		CLS_MONSTER = 90,
 		CLS_PLAYER = 89,
+		CLS_SPECIAL = 60,
+		CLS_FRONT = 21,
 	};
 	virtual ~artwork_t() {}
 	main_game_t& game;
@@ -123,6 +125,7 @@ struct main_game_t::artwork_t {
 	const glm::mat4 tx;
 	const glm::vec3 anchor;
 	const float scale_factor, speed, animation_length;
+	const float attack_points, health_points;
 	virtual void draw(float time,const glm::mat4& projection,const glm::mat4& modelview,const glm::vec3& light0,const glm::vec4& colour = glm::vec4(1,1,1,1)) = 0;
 	virtual artwork_t* get_child(const std::string& id) = 0;
 	virtual void bounds(glm::vec3& min,glm::vec3& max) = 0;
@@ -156,19 +159,21 @@ protected:
 		if(!ok) data_error("failed to load " << id);
 		game.on_ready(this);
 	}
-	artwork_t(main_game_t& g,artwork_t* p,const std::string& id_,const std::string& n,class_t c,float sf,const glm::vec3& a,float sp,float al):
+	artwork_t(main_game_t& g,artwork_t* p,const std::string& id_,const std::string& n,class_t c,float sf,const glm::vec3& a,float sp,float al,float ap,float hp):
 		game(g), parent(p), id(id_), name(n), cls(c),
 		tx(glm::scale(glm::vec3(sf,sf,sf))),
 		anchor(a),
-		scale_factor(sf), speed(sp), animation_length(al), _bounds(false) {}
+		scale_factor(sf), speed(sp), animation_length(al),
+		attack_points(ap), health_points(hp), _bounds(false) {}
 private:
 	rect_t _rect;
 	bool _bounds;
 };
 
 struct artwork_set_t: public main_game_t::artwork_t {
-	artwork_set_t(main_game_t& main,artwork_t* parent,const std::string& id_,class_t c,float sf,float sp,const glm::vec3& a,float al):
-		artwork_t(main,parent,id_,id_,c,sf,a,sp,al) {}
+	artwork_set_t(main_game_t& main,artwork_t* parent,const std::string& id_,class_t c,float sf,float sp,
+		const glm::vec3& a,float al,float attack_points,float health_points):
+		artwork_t(main,parent,id_,id_,c,sf,a,sp,al,attack_points,health_points) {}
 	~artwork_set_t() {
 		for(artworks_t::iterator i=artwork.begin(); i!=artwork.end(); i++)
 			delete *i;
@@ -199,24 +204,36 @@ struct artwork_set_t: public main_game_t::artwork_t {
 		}
 	}
 	void save(std::stringstream& xml) {
-		xml << "\t\t<asset id=\"" << id << "\" type=\"set\" class=\"" <<
+		std::string indent = "\t\t";
+		for(const artwork_t* p=parent; p; p = p->parent)
+			indent += "\t";
+		xml << indent << "<asset id=\"" << id << "\" type=\"set\" class=\"" <<
 			(cls == artwork_t::CLS_BACK?"back":
 			cls == artwork_t::CLS_PLAYER?"player":
-				"monster") << "\" ";
-		if(scale_factor !=1)
-			xml << " scale_factor=\"" << (parent && parent->scale_factor?scale_factor/parent->scale_factor:scale_factor) << "\"";
-		if(speed != 1)
-			xml << " speed=\"" << (parent && parent->speed?speed/parent->speed:speed) << "\"";
-		if(anchor.x != 0)
+			cls == artwork_t::CLS_SPECIAL?"special":
+			cls == artwork_t::CLS_FRONT?"front":
+			cls == artwork_t::CLS_MONSTER?"monster":
+				"BUG") << "\" ";
+		const float sf = (parent && parent->scale_factor?scale_factor/parent->scale_factor:scale_factor);
+		if(sf !=1)
+			xml << " scale_factor=\"" << sf << "\"";
+		const float sp = (parent && parent->speed?speed/parent->speed:speed);
+		if(sp != 1)
+			xml << " speed=\"" << sp << "\"";
+		if(attack_points)
+			xml << " attack_points=\"" << attack_points << "\"";
+		if(health_points)
+			xml << " health_points=\"" << health_points << "\"";
+		if(anchor.x)
 			xml << " anchor_x=\"" << anchor.x << "\"";
-		if(anchor.y != 0)
+		if(anchor.y)
 			xml << " anchor_y=\"" << anchor.y << "\"";
-		if(anchor.z != 0)
+		if(anchor.z)
 			xml << " anchor_z=\"" << anchor.z << "\"";
 		xml << ">\n";
 		for(artworks_t::iterator i=artwork.begin(); i!=artwork.end(); i++)
 			(*i)->save(xml);
-		xml << "\t\t</asset>\n";
+		xml << indent << "</asset>\n";
 	}
 	bool is_ready() {
 		for(artworks_t::iterator i=artwork.begin(); i!=artwork.end(); i++)
@@ -227,8 +244,9 @@ struct artwork_set_t: public main_game_t::artwork_t {
 };
 
 struct artwork_g3d_t: public main_game_t::artwork_t, private g3d_t::loaded_t {
-	artwork_g3d_t(main_game_t& main,artwork_t* parent,const std::string& id_,const std::string& p,class_t c,float sf,float sp,const glm::vec3& a,float al):
-		artwork_t(main,parent,id_,p,c,sf,a,sp,al),
+	artwork_g3d_t(main_game_t& main,artwork_t* parent,const std::string& id_,const std::string& p,class_t c,float sf,float sp,
+		const glm::vec3& a,float al,float attack_points,float health_points):
+		artwork_t(main,parent,id_,p,c,sf,a,sp,al,attack_points,health_points),
 		path(p), g3d(main,p,this), _ready(false) {}
 	const std::string path;
 	g3d_t g3d;
@@ -245,17 +263,27 @@ struct artwork_g3d_t: public main_game_t::artwork_t, private g3d_t::loaded_t {
 	artwork_t* get_child(const std::string& id) { return this; }
 	void bounds(glm::vec3& min,glm::vec3& max) { return g3d.bounds(min,max); }
 	void save(std::stringstream& xml) {
-		xml << "\t\t<asset id=\"" << id << "\" type=\"g3d\" class=\"" <<
+		std::string indent = "\t\t";
+		for(const artwork_t* p=parent; p; p = p->parent)
+			indent += "\t";
+		xml << indent << "<asset id=\"" << id << "\" type=\"g3d\" class=\"" <<
 			(cls == artwork_t::CLS_BACK?"back":
 			cls == artwork_t::CLS_PLAYER?"player":
-				"monster") <<
+			cls == artwork_t::CLS_SPECIAL?"special":
+			cls == artwork_t::CLS_FRONT?"front":
+			cls == artwork_t::CLS_MONSTER?"monster":
+				"BUG") <<
 			"\" path=\"" << path << "\"";
-		if(scale_factor !=1)
-			xml << " scale_factor=\"" << (parent && parent->scale_factor?scale_factor/parent->scale_factor:scale_factor) << "\"";
-		if(speed != 1)
-			xml << " speed=\"" << (parent && parent->speed?speed/parent->speed:speed) << "\"";
-		if(speed > 0)
-			xml << " speed=\"" << speed << "\"";
+		const float sf = (parent && parent->scale_factor?scale_factor/parent->scale_factor:scale_factor);
+		if(sf !=1)
+			xml << " scale_factor=\"" << sf << "\"";
+		const float sp = (parent && parent->speed?speed/parent->speed:speed);
+		if(sp != 1)
+			xml << " speed=\"" << sp << "\"";
+		if(attack_points)
+			xml << " attack_points=\"" << attack_points << "\"";
+		if(health_points)
+			xml << " health_points=\"" << health_points << "\"";
 		if(anchor.x != 0)
 			xml << " anchor_x=\"" << anchor.x << "\"";
 		if(anchor.y != 0)
@@ -280,6 +308,8 @@ main_game_t::artwork_t* main_game_t::load_asset(xml_walker_t& xml,artwork_t* par
 	if(scls == "back") cls = main_game_t::artwork_t::CLS_BACK;
 	else if(scls=="monster") cls = main_game_t::artwork_t::CLS_MONSTER;
 	else if(scls=="player") cls = main_game_t::artwork_t::CLS_PLAYER;
+	else if(scls=="special") cls = main_game_t::artwork_t::CLS_SPECIAL;
+	else if(scls=="front") cls = main_game_t::artwork_t::CLS_FRONT;
 	else data_error(scls << " is not a supported artwork class");
 	const glm::vec3 anchor(
 		xml.has_key("anchor_x")? xml.value_float("anchor_x"):0,
@@ -288,12 +318,14 @@ main_game_t::artwork_t* main_game_t::load_asset(xml_walker_t& xml,artwork_t* par
 	const float scaler = (xml.has_key("scale_factor")? xml.value_float("scale_factor"):1)*sf;
 	const float speed = (xml.has_key("speed")? xml.value_float("speed"):1) * sp;
 	const float animation_length = xml.has_key("animation_length")? xml.value_float("animation_length"): 0;
+	const float attack_points = xml.has_key("attack_points")? xml.value_float("attack_points"): 0;
+	const float health_points = xml.has_key("health_points")? xml.value_float("health_points"): 0;
 	if(type == "g3d") {
 		const std::string path = xml.value_string("path");
 		std::cout << "loading G3D " << path << std::endl;
-		return new artwork_g3d_t(*this,parent,id,path,cls,scaler,speed,anchor,animation_length);
+		return new artwork_g3d_t(*this,parent,id,path,cls,scaler,speed,anchor,animation_length,attack_points,health_points);
 	} else if(type == "set") {
-		artwork_set_t* set = new artwork_set_t(*this,parent,id,cls,scaler,speed,anchor,animation_length);
+		artwork_set_t* set = new artwork_set_t(*this,parent,id,cls,scaler,speed,anchor,animation_length,attack_points,health_points);
 		for(int i=0; xml.get_child("asset",i); i++, xml.up())
 			set->artwork.push_back(load_asset(xml,set));
 		return set;
@@ -551,7 +583,7 @@ void main_game_t::play_tick(float step) {
 		player->pos += move;
 	}
 	// move all monsters
-	const float attack_overlap = 0;
+	const float attack_overlap = 20;
 	const rect_t player_rect(player->effective_rect().shrink(glm::vec2(attack_overlap,0)));
 	bool attacked = false;
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
@@ -560,10 +592,11 @@ void main_game_t::play_tick(float step) {
 			if(monster.waiting) {
 				if(monster.is_visible(screen)) {
 					monster.waiting = false;
-					std::cout << "monster " << monster.artwork.id << ':' << monster.artwork.name << " activated" << std::endl;
+					std::cout << "monster " << monster.artwork.id << " activated" << std::endl;
 				}
 			} else {
 				bool run = false;
+				monster.attacking = false;
 				if(monster.pos.x < player->pos.x) {
 					run = true;
 					monster.dir[monster.state] = object_t::RIGHT;
@@ -583,6 +616,9 @@ void main_game_t::play_tick(float step) {
 					monster.pos = move;
 				} else
 					monster.set_action(monster.state,"idle");
+				if(monster.attacking && player->attacking &&
+					((player->pos.x > monster.pos.x) == (player->dir[object_t::WALKING] == object_t::LEFT)))
+					std::cout << "you hit monster " << monster.artwork.id << std::endl;
 			}
 		}
 }
