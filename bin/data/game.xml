@@ -22,7 +22,12 @@
 		<asset id="m03" type="g3d" class="monster" path="data/balrog fireball idle.G3D" scale_factor="30"/>
 		<asset id="m05" type="g3d" class="monster" path="data/bat_fly.g3d" scale_factor="60"/>
 		<asset id="m06" type="g3d" class="monster" path="data/bat_hang.g3d" scale_factor="60"/>
-		<asset id="p01" type="g3d" class="player" path="data/girl run v3.G3D" scale_factor="50" speed="250" animation_length="0.7"/>
+		<asset id="p01" type="set" class="player">
+			<asset class="idle" path="data/girlstand1.G3D" scale_factor="50" />
+			<asset class="idle" path="data/girlstand2.G3D" scale_factor="50" />
+			<asset class="run" path="data/girl run v3.G3D" scale_factor="50" speed="250" animation_length="0.7"/>
+			<asset class="jump" path="data/girl jump.G3D" scale_factor="50" speed="150" animation_length="0.7"/>
+		</asset>
 	</artwork>
 	<level>
 		<object asset="b02" x="-475" y="17"/>

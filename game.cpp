@@ -29,14 +29,15 @@ public:
 	bool on_key_up(short code,const input_key_map_t& map,const input_mouse_map_t& mouse);
 	bool on_mouse_down(int x,int y,mouse_button_t button,const input_key_map_t& map,const input_mouse_map_t& mouse);
 	bool on_mouse_up(int x,int y,mouse_button_t button,const input_key_map_t& map,const input_mouse_map_t& mouse);
-private:
 	struct artwork_t;
+private:
 	friend struct artwork_t;
 	void on_ready(artwork_t* artwork);
 	bool is_ready() const;
 	void save();
 	void play();
 	void play_tick(float step);
+	artwork_t* load_asset(xml_walker_t& xml);
 	enum {
 		LOAD_GAME_XML,
 	};
@@ -90,32 +91,77 @@ private:
 
 const float main_game_t::PAN_RATE = 800; // px/sec
 
-struct main_game_t::artwork_t: public g3d_t, public g3d_t::loaded_t {
+struct main_game_t::artwork_t {
 	enum class_t {
 		CLS_BACK = 150,
 		CLS_MONSTER = 90,
 		CLS_PLAYER = 89,
 	};
-	artwork_t(main_game_t& main,const std::string& id_,const std::string& p,class_t c,float sf,float sp,const glm::vec3& a,float al):
-		g3d_t(main,p,this), game(main), id(id_), path(p), cls(c),
-		tx(glm::scale(glm::vec3(sf,sf,sf))),
-		anchor(glm::scale(glm::vec3(sf,sf,sf))*glm::vec4(a,1)),
-		scale_factor(sf), speed(sp), animation_length(al) {}
+	virtual ~artwork_t() {}
 	main_game_t& game;
-	const std::string id, path;
-	class_t cls;
+	const std::string id;
+	const class_t cls;
 	const glm::mat4 tx;
 	const glm::vec4 anchor;
-	const float scale_factor, speed, animation_length;
-	void on_g3d_loaded(g3d_t& g3d,bool ok,intptr_t data) {
-		if(!ok) data_error("failed to load " << filename);
+	const float speed;
+	virtual void draw(float time,const glm::mat4& projection,const glm::mat4& modelview,const glm::vec3& light0,const glm::vec4& colour = glm::vec4(1,1,1,1)) = 0;
+	virtual artwork_t* get_child(const std::string& id) { return this; }
+	virtual artwork_t* get_child(size_t i) { return NULL; }
+	virtual void bounds(glm::vec3& min,glm::vec3& max) = 0;
+	virtual void save(std::stringstream& xml) = 0;
+	bool is_ready() const { return _ready; }
+protected:
+	void on_ready(bool ok) {
+		if(!ok) data_error("failed to load " << id);
+		_ready = true;
 		game.on_ready(this);
+	}
+	artwork_t(main_game_t& g,const std::string& id_,class_t c,const glm::mat4& t,const glm::vec4& a,float s):
+		game(g), id(id_), cls(c), tx(t), anchor(a), speed(s), _ready(false) {}
+	bool _ready;
+};	
+	
+struct g3d_artwork_t: public main_game_t::artwork_t, private g3d_t::loaded_t {
+	g3d_artwork_t(main_game_t& main,const std::string& id_,const std::string& p,class_t c,float sf,float sp,const glm::vec3& a,float al):
+		artwork_t(main,id_,c,glm::scale(glm::vec3(sf,sf,sf)),glm::scale(glm::vec3(sf,sf,sf))*glm::vec4(a,1),sp),
+		path(p), scale_factor(sf), animation_length(al),
+		g3d(main,p,this) {}
+	const std::string path;
+	const float scale_factor, animation_length;
+	g3d_t g3d;
+	void on_g3d_loaded(g3d_t& g3d,bool ok,intptr_t data) {
+		if(!ok) data_error("failed to load " << path);
+		artwork_t::on_ready(this);
+	}
+	void draw(float time,const glm::mat4& projection,const glm::mat4& modelview,const glm::vec3& light0,const glm::vec4& colour) {
+		const float anim_len = (animation_length>0?animation_length:2);
+		const float t = fmod(time/anim_len,1);
+		g3d.draw(t,projection,modelview,light0,colour);
+	}
+	void bounds(glm::vec3& min,glm::vec3& max) { return g3d.bounds(min,max); }
+	void save(std::stringstream& xml) {
+		xml << "\t\t<asset id=\"" << id << "\" type=\"g3d\" class=\"" <<
+			(cls == artwork_t::CLS_BACK?"back":
+			cls == artwork_t::CLS_PLAYER?"player":
+				"monster") <<
+			"\" path=\"" << path << "\" scale_factor=\"" << scale_factor << "\"";
+		if(speed > 0)
+			xml << " speed=\"" << speed << "\"";
+		if(anchor.x != 0)
+			xml << " anchor_x=\"" << anchor.x << "\"";
+		if(anchor.y != 0)
+			xml << " anchor_y=\"" << anchor.y << "\"";
+		if(anchor.z != 0)
+			xml << " anchor_z=\"" << anchor.z << "\"";
+		if(animation_length > 0)
+			xml << " animation_length=\"" << animation_length << "\"";
+		xml << "/>\n";
 	}
 };
 
 struct main_game_t::object_t {
 	object_t(artwork_t& a,const glm::vec2& p):
-		artwork(a), pos(p), dir(IDLE), state(WALKING), animation_start(a.main.now_secs()) {}
+		artwork(a), pos(p), dir(IDLE), state(WALKING), active_artwork(a.get_child("idle")), animation_start(a.game.now_secs()) {}
 	artwork_t& artwork;
 	glm::vec2 pos;
 	enum {
@@ -128,6 +174,7 @@ struct main_game_t::object_t {
 		JUMPING,
 	} state;
 	double jump_gravity, jump_energy;
+	artwork_t* active_artwork;
 	double animation_start;
 	glm::mat4 tx() {
 		glm::mat4 tx(glm::translate(glm::vec3(pos,-artwork.cls))*artwork.tx);
@@ -177,6 +224,30 @@ bool main_game_t::is_ready() const {
 	return true;
 }
 
+main_game_t::artwork_t* main_game_t::load_asset(xml_walker_t& xml) {
+	const std::string id = xml.value_string("id"),
+		type = xml.value_string("type"), 
+		scls = xml.value_string("class");
+	main_game_t::artwork_t::class_t cls;
+	if(scls == "back") cls = main_game_t::artwork_t::CLS_BACK;
+	else if(scls=="monster") cls = main_game_t::artwork_t::CLS_MONSTER;
+	else if(scls=="player") cls = main_game_t::artwork_t::CLS_PLAYER;
+	else data_error(scls << " is not a supported artwork class");
+	const glm::vec3 anchor(
+		xml.has_key("anchor_x")? xml.value_float("anchor_x"):0,
+		xml.has_key("anchor_y")? xml.value_float("anchor_y"):0,
+		xml.has_key("anchor_z")? xml.value_float("anchor_z"):0);
+	const float speed = xml.has_key("speed")? xml.value_float("speed"):0;
+	if(type == "g3d") {
+		const std::string path = xml.value_string("path");
+		const float scaler = xml.has_key("scale_factor")? xml.value_float("scale_factor"):1.0;
+		const float animation_length = xml.has_key("animation_length")? xml.value_float("animation_length"): 0;
+		std::cout << "loading G3D " << path << std::endl;
+		return new g3d_artwork_t(*this,id,path,cls,scaler,speed,anchor,animation_length);
+	} else
+		data_error("unsupported artwork type "<<type);
+}
+
 void main_game_t::on_io(const std::string& name,bool ok,const std::string& bytes,intptr_t data) {
 	if(!ok) data_error("could not load " << name);
 	switch(data) {
@@ -185,30 +256,11 @@ void main_game_t::on_io(const std::string& name,bool ok,const std::string& bytes
 		xml_walker_t xml(game_xml.walker());
 		xml.check("game").get_child("artwork");
 		for(int i=0; xml.get_child("asset",i); i++, xml.up()) {
-			const std::string id = xml.value_string("id"),
-				type = xml.value_string("type"), 
-				scls = xml.value_string("class"),
-				path = xml.value_string("path");
-			const float scaler = xml.has_key("scale_factor")? xml.value_float("scale_factor"):1.0;
-			const float speed = xml.has_key("speed")? xml.value_float("speed"):0;
-			const float animation_length = xml.has_key("animation_length")? xml.value_float("animation_length"): 0;
-			const glm::vec3 anchor(
-				xml.has_key("anchor_x")? xml.value_float("anchor_x"):0,
-				xml.has_key("anchor_y")? xml.value_float("anchor_y"):0,
-				xml.has_key("anchor_z")? xml.value_float("anchor_z"):0);
-			artwork_t::class_t cls;
-			if(scls == "back") cls = artwork_t::CLS_BACK;
-			else if(scls=="monster") cls = artwork_t::CLS_MONSTER;
-			else if(scls=="player") cls = artwork_t::CLS_PLAYER;
-			else data_error(scls << " is not a supported artwork class");
-			if(artwork.find(id) != artwork.end())
-				data_error("dupicate asset ID " << id);
-			if(type == "g3d") {
-				std::cout << "loading G3D " << path << std::endl;
-				artwork[id] = new artwork_t(*this,id,path,cls,scaler,speed,anchor,animation_length);
-				if(!active_model) active_model = artwork[id];
-			} else
-				data_error("unsupported artwork type "<<type);
+			artwork_t* a = load_asset(xml);
+			if(artwork.find(a->id) != artwork.end())
+				data_error("dupicate asset ID " << a->id);
+			artwork[a->id] = a;
+			if(!active_model) active_model = a;
 		}
 		xml.up();
 	} break;
@@ -268,16 +320,12 @@ bool main_game_t::tick() {
 		1,300));
 	const glm::vec3 light0(10,10,10);
 	// show all the objects
-	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++) {
-		artwork_t& art = (*i)->artwork;
-		const float anim_len = (art.animation_length>0?art.animation_length:2);
-		const float time = fmod((now-(*i)->animation_start)/anim_len,1);
-		art.draw(time,projection,(*i)->tx(),light0);
-	}
+	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
+		(*i)->artwork.draw(elapsed-(*i)->animation_start,projection,(*i)->tx(),light0);
 	if(mode != MODE_PLAY) {
 		// show active model on top for editing
 		if((mode == MODE_PLACE_OBJECT) && active_model && mouse_down) {
-			active_model->draw(fmod(elapsed*.5,1),projection,
+			active_model->draw(elapsed,projection,
 				glm::translate(glm::vec3(screen_centre.x+mouse_x-width/2,screen_centre.y-mouse_y+height/2,-50))*
 					active_model->tx,
 				light0,glm::vec4(1,.6,.6,.6));
@@ -299,7 +347,7 @@ bool main_game_t::tick() {
 
 void main_game_t::play_tick(float step) {
 	// move main player
-	glm::vec2 move(player->artwork.speed * step * (player->state==object_t::JUMPING?player->jump_dir:player->dir),0),
+	glm::vec2 move(player->active_artwork->speed * step * (player->state==object_t::JUMPING?player->jump_dir:player->dir),0),
 		player_pos(glm::vec2(player->artwork.anchor.x,player->artwork.anchor.y)+player->pos);
 	float floor_y;
 	if(floor->y_at(player_pos,floor_y,true)) {
@@ -337,24 +385,8 @@ void main_game_t::save() {
 	std::cout << "saving..." << std::endl;
 	std::stringstream xml(std::ios_base::out|std::ios_base::ate);
 	xml << "<game>\n\t<artwork>\n";
-	for(artworks_t::iterator a=artwork.begin(); a!=artwork.end(); a++) {
-		xml << "\t\t<asset id=\"" << a->first << "\" type=\"g3d\" class=\"" <<
-			(a->second->cls == artwork_t::CLS_BACK?"back":
-			a->second->cls == artwork_t::CLS_PLAYER?"player":
-				"monster") <<
-			"\" path=\"" << a->second->path << "\" scale_factor=\"" << a->second->scale_factor << "\"";
-		if(a->second->speed > 0)
-			xml << " speed=\"" << a->second->speed << "\"";
-		if(a->second->anchor.x != 0)
-			xml << " anchor_x=\"" << a->second->anchor.x << "\"";
-		if(a->second->anchor.y != 0)
-			xml << " anchor_y=\"" << a->second->anchor.y << "\"";
-		if(a->second->anchor.z != 0)
-			xml << " anchor_z=\"" << a->second->anchor.z << "\"";
-		if(a->second->animation_length > 0)
-			xml << " animation_length=\"" << a->second->animation_length << "\"";
-		xml << "/>\n";
-	}
+	for(artworks_t::iterator a=artwork.begin(); a!=artwork.end(); a++)
+		a->second->save(xml);
 	xml << "\t</artwork>\n\t<level>\n";
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
 		xml << "\t\t<object asset=\"" << (*i)->artwork.id << "\" x=\"" << (*i)->pos.x << "\" y=\"" << (*i)->pos.y << "\"/>\n";
@@ -437,7 +469,7 @@ bool main_game_t::on_key_down(short code,const input_key_map_t& map,const input_
 	case 'e': 
 		active_object = NULL;
 		mode = MODE_EDIT_OBJECT;
-		std::cout << "OBJECT EDIT MODE " << (active_object?active_object->artwork.path:"<no selection>") << std::endl; 
+		std::cout << "OBJECT EDIT MODE " << (active_object?active_object->artwork.id:"<no selection>") << std::endl; 
 		return true;
 	case 'o':
 		if(mode == MODE_PLACE_OBJECT) {
@@ -454,7 +486,7 @@ bool main_game_t::on_key_down(short code,const input_key_map_t& map,const input_
 				active_model = artwork.begin()->second;
 		}
 		mode = MODE_PLACE_OBJECT;
-		std::cout << "OBJECT PLACEMENT MODE " << active_model->path << std::endl; 
+		std::cout << "OBJECT PLACEMENT MODE " << active_model->id << std::endl; 
 		return true;
 	case 'p':
 		play();
@@ -497,7 +529,7 @@ bool main_game_t::on_key_up(short code,const input_key_map_t& map,const input_mo
 		case MODE_EDIT_OBJECT:
 			if(code == KEY_BACKSPACE) {
 				if(active_object) {
-					std::cout << "DELETING OBJECT " << active_object->artwork.path << std::endl;
+					std::cout << "DELETING OBJECT " << active_object->artwork.id << std::endl;
 					objects.erase(std::find(objects.begin(),objects.end(),active_object));
 					delete active_object;
 					active_object = NULL;
@@ -560,7 +592,7 @@ bool main_game_t::on_mouse_down(int x,int y,mouse_button_t button,const input_ke
 					break;
 				}
 			}
-			std::cout << "OBJECT EDIT MODE " << (active_object?active_object->artwork.path:"<no selection>") << std::endl; 
+			std::cout << "OBJECT EDIT MODE " << (active_object?active_object->artwork.id:"<no selection>") << std::endl; 
 		}
 		break;
 	case MODE_FLOOR:
@@ -596,7 +628,7 @@ bool main_game_t::on_mouse_up(int x,int y,mouse_button_t button,const input_key_
 		break;
 	case MODE_PLACE_OBJECT:
 		if(active_model) {
-			std::cout << "creating new object of " << active_model->filename << std::endl;
+			std::cout << "creating new object of " << active_model->id << std::endl;
 			const glm::vec2 pos(mapped_x,mapped_y);
 			objects.push_back(new object_t(*active_model,pos));
 		} else
