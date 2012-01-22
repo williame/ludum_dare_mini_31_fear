@@ -17,6 +17,34 @@ void create_shaders(main_t& main); // shaders.cpp
 
 const char* const main_t::game_name = "Ludum Dare Mini 31 - Fear"; // window titles etc
 
+struct rect_t {
+	rect_t() {}
+	rect_t(const glm::vec2& a,const glm::vec2& b): bl(a), tr(b) {}
+	glm::vec2 bl, tr;
+	bool intersects(const rect_t& other) const {
+		return (bl.x < other.tr.x && tr.x > other.bl.x &&
+			bl.y < other.tr.y && tr.y > other.bl.y);
+	}
+	bool contains(const glm::vec2& p) const {
+		return (p.x >= bl.x && p.y >= bl.y && p.x < tr.x && p.y < tr.y);
+	}
+	glm::vec2 centre() const {
+		return glm::vec2((bl.x+tr.x)/2,(bl.y+tr.y)/2);
+	}
+	void normalise() {
+		const float minx(std::min(bl.x,tr.x)), miny(std::min(bl.y,tr.y)),
+			maxx(std::max(bl.x,tr.x)), maxy(std::max(bl.y,tr.y));
+		bl = glm::vec2(minx,miny);
+		tr = glm::vec2(maxx,maxy);
+	}
+	rect_t shrink(const glm::vec2& margin) const {
+		rect_t ret(bl+margin,tr+margin);
+		ret.normalise(); // so we don't care if it turns inside out
+		return ret;
+	}
+	void draw(main_t& main,const glm::mat4& mvp,glm::vec4 colour);
+};
+
 class main_game_t: public main_t, private main_t::file_io_t {
 public:
 	main_game_t(void* platform_ptr): main_t(platform_ptr),
@@ -37,7 +65,7 @@ private:
 	void save();
 	void play();
 	void play_tick(float step);
-	artwork_t* load_asset(xml_walker_t& xml,float sf=1,float sp=1);
+	artwork_t* load_asset(xml_walker_t& xml,artwork_t* parent=NULL);
 	enum {
 		LOAD_GAME_XML,
 	};
@@ -62,24 +90,13 @@ private:
 	object_t* active_object;
 	glm::vec2 pan_rate, active_object_anchor;
 	object_t* player;
-	glm::vec2 screen_bl, screen_tr;
-	struct hot_t {
+	rect_t screen;
+	struct hot_t: public rect_t {
 		hot_t(): type(BAD) {}
-		glm::vec2 a, b;
 		enum {
 			STOP,
 			BAD
 		} type;
-		void draw(main_t& main,const glm::mat4& mvp,glm::vec4 colour);
-		void normalise() {
-			const float minx(std::min(a.x,b.x)), miny(std::min(a.y,b.y)),
-				maxx(std::max(a.x,b.x)), maxy(std::max(a.y,b.y));
-			a = glm::vec2(minx,miny);
-			b = glm::vec2(maxx,maxy);
-		}
-		bool contains(const glm::vec2& p) const {
-			return (p.x >= a.x && p.y >= a.y && p.x < b.x && p.y < b.y);
-		}
 	};
 	typedef std::vector<hot_t> hots_t;
 	hots_t hots;
@@ -100,6 +117,7 @@ struct main_game_t::artwork_t {
 	};
 	virtual ~artwork_t() {}
 	main_game_t& game;
+	artwork_t* const parent;
 	const std::string id, name;
 	const class_t cls;
 	const glm::mat4 tx;
@@ -108,6 +126,20 @@ struct main_game_t::artwork_t {
 	virtual void draw(float time,const glm::mat4& projection,const glm::mat4& modelview,const glm::vec3& light0,const glm::vec4& colour = glm::vec4(1,1,1,1)) = 0;
 	virtual artwork_t* get_child(const std::string& id) = 0;
 	virtual void bounds(glm::vec3& min,glm::vec3& max) = 0;
+	rect_t rect() {
+		if(!_bounds && is_ready()) {
+			glm::vec3 min, max;
+			bounds(min,max);
+			const glm::vec4
+				mn = tx*glm::vec4(min,1.),
+				mx = tx*glm::vec4(max,1.);
+			_rect.bl = glm::vec2(mn.x-anchor.x,mn.y-anchor.y);
+			_rect.tr = glm::vec2(mx.x-anchor.x,mx.y-anchor.y);
+			_rect.normalise();
+			_bounds = true;
+		}
+		return _rect;
+	}
 	virtual void save(std::stringstream& xml) = 0;
 	virtual bool is_ready() = 0;
 	float effective_animation_length() const { return animation_length? animation_length: 2; }
@@ -116,16 +148,19 @@ protected:
 		if(!ok) data_error("failed to load " << id);
 		game.on_ready(this);
 	}
-	artwork_t(main_game_t& g,const std::string& id_,const std::string& n,class_t c,float sf,const glm::vec3& a,float sp,float al):
-		game(g), id(id_), name(n), cls(c),
+	artwork_t(main_game_t& g,artwork_t* p,const std::string& id_,const std::string& n,class_t c,float sf,const glm::vec3& a,float sp,float al):
+		game(g), parent(p), id(id_), name(n), cls(c),
 		tx(glm::scale(glm::vec3(sf,sf,sf))),
 		anchor(a),
-		scale_factor(sf), speed(sp), animation_length(al) {}
+		scale_factor(sf), speed(sp), animation_length(al), _bounds(false) {}
+private:
+	rect_t _rect;
+	bool _bounds;
 };
 
 struct artwork_set_t: public main_game_t::artwork_t {
-	artwork_set_t(main_game_t& main,const std::string& id_,class_t c,float sf,float sp,const glm::vec3& a,float al):
-		artwork_t(main,id_,id_,c,sf,a,sp,al) {}
+	artwork_set_t(main_game_t& main,artwork_t* parent,const std::string& id_,class_t c,float sf,float sp,const glm::vec3& a,float al):
+		artwork_t(main,parent,id_,id_,c,sf,a,sp,al) {}
 	~artwork_set_t() {
 		for(artworks_t::iterator i=artwork.begin(); i!=artwork.end(); i++)
 			delete *i;
@@ -159,10 +194,11 @@ struct artwork_set_t: public main_game_t::artwork_t {
 		xml << "\t\t<asset id=\"" << id << "\" type=\"set\" class=\"" <<
 			(cls == artwork_t::CLS_BACK?"back":
 			cls == artwork_t::CLS_PLAYER?"player":
-				"monster") <<
-			"\" scale_factor=\"" << scale_factor << "\"";
-		if(speed > 0)
-			xml << " speed=\"" << speed << "\"";
+				"monster") << "\" ";
+		if(scale_factor !=1)
+			xml << " scale_factor=\"" << (parent && parent->scale_factor?scale_factor/parent->scale_factor:scale_factor) << "\"";
+		if(speed != 1)
+			xml << " speed=\"" << (parent && parent->speed?speed/parent->speed:speed) << "\"";
 		if(anchor.x != 0)
 			xml << " anchor_x=\"" << anchor.x << "\"";
 		if(anchor.y != 0)
@@ -183,8 +219,8 @@ struct artwork_set_t: public main_game_t::artwork_t {
 };
 
 struct artwork_g3d_t: public main_game_t::artwork_t, private g3d_t::loaded_t {
-	artwork_g3d_t(main_game_t& main,const std::string& id_,const std::string& p,class_t c,float sf,float sp,const glm::vec3& a,float al):
-		artwork_t(main,id_,p,c,sf,a,sp,al),
+	artwork_g3d_t(main_game_t& main,artwork_t* parent,const std::string& id_,const std::string& p,class_t c,float sf,float sp,const glm::vec3& a,float al):
+		artwork_t(main,parent,id_,p,c,sf,a,sp,al),
 		path(p), g3d(main,p,this), _ready(false) {}
 	const std::string path;
 	g3d_t g3d;
@@ -205,7 +241,11 @@ struct artwork_g3d_t: public main_game_t::artwork_t, private g3d_t::loaded_t {
 			(cls == artwork_t::CLS_BACK?"back":
 			cls == artwork_t::CLS_PLAYER?"player":
 				"monster") <<
-			"\" path=\"" << path << "\" scale_factor=\"" << scale_factor << "\"";
+			"\" path=\"" << path << "\"";
+		if(scale_factor !=1)
+			xml << " scale_factor=\"" << (parent && parent->scale_factor?scale_factor/parent->scale_factor:scale_factor) << "\"";
+		if(speed != 1)
+			xml << " speed=\"" << (parent && parent->speed?speed/parent->speed:speed) << "\"";
 		if(speed > 0)
 			xml << " speed=\"" << speed << "\"";
 		if(anchor.x != 0)
@@ -222,7 +262,9 @@ struct artwork_g3d_t: public main_game_t::artwork_t, private g3d_t::loaded_t {
 	bool _ready;
 };
 
-main_game_t::artwork_t* main_game_t::load_asset(xml_walker_t& xml,float sf,float sp) {
+main_game_t::artwork_t* main_game_t::load_asset(xml_walker_t& xml,artwork_t* parent) {
+	const float sf = parent? parent->scale_factor: 1;
+	const float sp = parent? parent->speed: 1;
 	const std::string id = xml.value_string("id"),
 		type = xml.value_string("type"), 
 		scls = xml.value_string("class");
@@ -241,11 +283,11 @@ main_game_t::artwork_t* main_game_t::load_asset(xml_walker_t& xml,float sf,float
 	if(type == "g3d") {
 		const std::string path = xml.value_string("path");
 		std::cout << "loading G3D " << path << std::endl;
-		return new artwork_g3d_t(*this,id,path,cls,scaler,speed,anchor,animation_length);
+		return new artwork_g3d_t(*this,parent,id,path,cls,scaler,speed,anchor,animation_length);
 	} else if(type == "set") {
-		artwork_set_t* set = new artwork_set_t(*this,id,cls,scaler,speed,anchor,animation_length);
+		artwork_set_t* set = new artwork_set_t(*this,parent,id,cls,scaler,speed,anchor,animation_length);
 		for(int i=0; xml.get_child("asset",i); i++, xml.up())
-			set->artwork.push_back(load_asset(xml,scaler,speed));
+			set->artwork.push_back(load_asset(xml,set));
 		return set;
 	} else
 		data_error("unsupported artwork type "<<type);
@@ -259,14 +301,6 @@ struct main_game_t::object_t {
 			active_artwork[WALKING] = active_artwork[JUMPING] = artwork.get_child("idle");
 			speed[WALKING] = speed[JUMPING] = 0;
 			animation_start[WALKING] = animation_start[JUMPING] = artwork.game.now_secs();
-			glm::vec3 min, max;
-			artwork.bounds(min,max);
-			const glm::vec4 sz = artwork.tx*glm::vec4(max-min,1.),
-				mn = artwork.tx*glm::vec4(min,1.),
-				mx = artwork.tx*glm::vec4(max,1.);
-			bl = glm::vec2(mn.x,mn.y);
-			tr = glm::vec2(mx.x,mx.y);
-			centre = glm::vec2(sz.x/2,sz.y/2);
 		}
 	artwork_t& artwork;
 	glm::vec2 pos;
@@ -286,7 +320,6 @@ struct main_game_t::object_t {
 	artwork_t* active_artwork[STATE_LAST];
 	double animation_start[STATE_LAST], speed[STATE_LAST];
 	std::string action[STATE_LAST];
-	glm::vec2 bl, tr, centre;
 	void set_action(state_t state,const std::string& action) {
 		if(action == this->action[state]) return;
 		this->action[state] = action;
@@ -314,18 +347,21 @@ struct main_game_t::object_t {
 			tx *= glm::rotate(90.0f,glm::vec3(0,1,0));
 		return tx;
 	}
-	bool is_visible(const glm::vec2& bl,const glm::vec2& tr) const {
-		return (pos.x+this->bl.x < tr.x && pos.x+this->tr.x > bl.x &&
-			pos.y+this->bl.y < tr.y && pos.y+this->tr.y > bl.y);
+	bool is_visible(const rect_t& screen) const {
+		return screen.intersects(effective_rect());
+	}
+	rect_t effective_rect() const {
+		rect_t rect = active_artwork[state]->rect();
+		return rect_t(rect.bl+pos,rect.tr+pos);
 	}
 };
 
-void main_game_t::hot_t::draw(main_t& main,const glm::mat4& mvp,glm::vec4 colour) {
+void rect_t::draw(main_t& main,const glm::mat4& mvp,glm::vec4 colour) {
 	const GLfloat data[4*2] = {
-		a.x,a.y,
-		b.x,a.y,
-		b.x,b.y,
-		a.x,b.y};
+		bl.x,bl.y,
+		tr.x,bl.y,
+		tr.x,tr.y,
+		bl.x,tr.y};
 	GLuint program = main.get_shared_program("path_t"),
 		uniform_mvp_matrix = main.get_uniform_loc(program,"MVP_MATRIX",GL_FLOAT_MAT4),
 		uniform_colour = main.get_uniform_loc(program,"COLOUR",GL_FLOAT_VEC4),
@@ -347,7 +383,7 @@ void main_game_t::hot_t::draw(main_t& main,const glm::mat4& mvp,glm::vec4 colour
 
 void main_game_t::init() {
 	create_shaders(*this);
-	glClearColor(1,0,0,1);
+	glClearColor(0,0,0,1);
 	read_file("data/game.xml",this,LOAD_GAME_XML);
 }
 
@@ -393,10 +429,10 @@ void main_game_t::on_ready(artwork_t*) {
 			objects.push_back(new object_t(*artwork[asset],glm::vec2(x,y)));
 		}
 		for(int i=0; xml.get_child("hot",i); i++, xml.up()) {
-			new_hot.a.x = xml.value_float("x1");
-			new_hot.a.y = xml.value_float("y1");
-			new_hot.b.x = xml.value_float("x2");
-			new_hot.b.y = xml.value_float("y2");
+			new_hot.bl.x = xml.value_float("x1");
+			new_hot.bl.y = xml.value_float("y1");
+			new_hot.tr.x = xml.value_float("x2");
+			new_hot.tr.y = xml.value_float("y2");
 			new_hot.normalise();
 			const std::string type = xml.value_string("type");
 			if(type == "stop") new_hot.type = hot_t::STOP;
@@ -411,6 +447,9 @@ void main_game_t::on_ready(artwork_t*) {
 		ceiling->load(xml);
 		xml.up();
 		glClearColor(1,1,1,1);
+		
+		//###
+		play();
 	}
 }
 
@@ -421,20 +460,23 @@ bool main_game_t::tick() {
 		since_last = now-last_tick;
 	if(mode == MODE_PLAY) {
 		play_tick(since_last);
-		screen_centre = player->pos + player->centre;
+		screen_centre = player->pos + player->artwork.rect().centre();
 	} else
 		screen_centre += pan_rate * glm::vec2(since_last,since_last);
-	screen_bl = glm::vec2(screen_centre.x-width/2,screen_centre.y-height/2);
-	screen_tr = glm::vec2(screen_centre.x+width/2,screen_centre.y+height/2);
+	screen.bl = glm::vec2(screen_centre.x-width/2,screen_centre.y-height/2);
+	screen.tr = glm::vec2(screen_centre.x+width/2,screen_centre.y+height/2);
 	const glm::mat4 projection(glm::ortho<float>(
-		screen_bl.x,screen_tr.x, // 0,0 is screen centre
-		screen_bl.y,screen_tr.y, // y increases upwards
+		screen.bl.x,screen.tr.x, // 0,0 is screen centre
+		screen.bl.y,screen.tr.y, // y increases upwards
 		1,300));
 	const glm::vec3 light0(10,10,10);
 	// show all the objects
-	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
-		if((*i)->is_visible(screen_bl,screen_tr))
+	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++) {
+		if((*i)->is_visible(screen))
 			(*i)->draw(now,projection,light0);
+		if((*i)->attacking)
+			(*i)->effective_rect().draw(*this,projection,glm::vec4(1,0,0,1));
+	}
 	if(mode != MODE_PLAY) {
 		// show active model on top for editing
 		if((mode == MODE_PLACE_OBJECT) && active_model && mouse_down) {
@@ -500,24 +542,38 @@ void main_game_t::play_tick(float step) {
 		player->pos += move;
 	}
 	// move all monsters
+	const float attack_overlap = 0;
+	const rect_t player_rect(player->effective_rect().shrink(glm::vec2(attack_overlap,0)));
+	bool attacked = false;
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
 		if((*i)->artwork.cls == artwork_t::CLS_MONSTER) {
 			object_t& monster = **i;
 			if(monster.waiting) {
-				// if you haven't seen the monster, it stays put
-				monster.waiting = !monster.is_visible(screen_bl,screen_tr);
+				if(monster.is_visible(screen)) {
+					monster.waiting = false;
+					std::cout << "monster " << monster.artwork.id << ':' << monster.artwork.name << " activated" << std::endl;
+				}
 			} else {
+				bool run = false;
 				if(monster.pos.x < player->pos.x) {
-					monster.set_action(monster.state,"run");
+					run = true;
 					monster.dir[monster.state] = object_t::RIGHT;
 				} else if(monster.pos.x > player->pos.x) {
-					monster.set_action(monster.state,"run");
+					run = true;
 					monster.dir[monster.state] = object_t::LEFT;
+				}
+				if(monster.effective_rect().shrink(glm::vec2(attack_overlap,0)).intersects(player_rect)) {
+					run = false;
+					attacked = true;
+					monster.attacking = true;
+					monster.set_action(monster.state,"attack");
+				} else if(run) {
+					monster.set_action(monster.state,"run");
+					const float speed = monster.active_artwork[monster.state]->speed;
+					glm::vec2 move = floor->route(monster.pos,speed*step,player->pos,true);
+					monster.pos = move;
 				} else
 					monster.set_action(monster.state,"idle");
-				const float speed = monster.active_artwork[monster.state]->speed;
-				glm::vec2 move = floor->route(monster.pos,speed*step,player->pos,true);
-				monster.pos = move;
 			}
 		}
 }
@@ -536,7 +592,7 @@ void main_game_t::save() {
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
 		xml << "\t\t<object asset=\"" << (*i)->artwork.id << "\" x=\"" << (*i)->pos.x << "\" y=\"" << (*i)->pos.y << "\"/>\n";
 	for(hots_t::iterator i=hots.begin(); i!=hots.end(); i++) {
-		xml << "\t\t<hot x1=\"" << i->a.x << "\" y1=\"" << i->a.y << "\" x2=\"" << i->b.x << "\" y2=\"" << i->b.y << "\" type=\"";
+		xml << "\t\t<hot x1=\"" << i->bl.x << "\" y1=\"" << i->bl.y << "\" x2=\"" << i->tr.x << "\" y2=\"" << i->tr.y << "\" type=\"";
 		if(i->type == hot_t::STOP) xml << "stop";
 		else data_error(i->type);
 		xml << "\"/>\n";
@@ -785,9 +841,9 @@ bool main_game_t::on_mouse_down(int x,int y,mouse_button_t button) {
 		break;
 	case MODE_HOT:
 		if(!draw_hot)
-			new_hot.a = glm::vec2(mapped_x,mapped_y);
+			new_hot.bl = glm::vec2(mapped_x,mapped_y);
 		draw_hot = true;
-		new_hot.b = glm::vec2(mapped_x,mapped_y);
+		new_hot.tr = glm::vec2(mapped_x,mapped_y);
 		break;
 	default:;
 	}
