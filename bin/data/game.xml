@@ -1,5 +1,8 @@
 <game>
 	<artwork>
+		<asset id="SPLASH" type="splash" class="front" path="data/splash.jpg" scale_factor="30"/>
+		<asset id="WIN" type="splash" class="front" path="data/win.jpg" scale_factor="30"/>
+		<asset id="LOSE" type="splash" class="front" path="data/lose.jpg" scale_factor="30"/>
 		<asset id="b01" type="g3d" class="back" path="data/tunnel_back1.g3d" scale_factor="30"/>
 		<asset id="b02" type="g3d" class="back" path="data/tunnel_back2.g3d" scale_factor="30"/>
 		<asset id="b03" type="g3d" class="back" path="data/tunnel_back3.g3d" scale_factor="30"/>
@@ -15,7 +18,7 @@
 		<asset id="b15" type="g3d" class="back" path="data/tunnel_end_left.g3d" scale_factor="30"/>
 		<asset id="b16" type="g3d" class="back" path="data/tunnel_end_right.g3d" scale_factor="30"/>
 		<asset id="b17" type="g3d" class="back" path="data/tunnel_updown2.g3d" scale_factor="30"/>
-		<asset id="balrog1" type="set" class="monster"  scale_factor="30">
+		<asset id="balrog1" type="set" class="monster"  scale_factor="30" attack_points="10" health_points="2500000"> <!--invincible -->
 			<asset id="pitfall" type="g3d" class="monster" path="data/ballrog pitfall.G3D"/>
 			<asset id="attack" type="g3d" class="monster" path="data/balrog attack.G3D"/>
 			<asset id="idle" type="g3d" class="monster" path="data/balrog fireball idle.G3D"/>
@@ -24,7 +27,7 @@
 			<asset id="run" type="g3d" class="monster" path="data/balrog walk.G3D" speed="20"/>
 			<asset id="stop" type="g3d" class="monster" path="data/balrog walk to idle.G3D"/>
 		</asset>
-		<asset id="bat1" type="set" class="monster"  scale_factor="60" anchor_y="-100" anchor_z="20">
+		<asset id="bat1" type="set" class="monster"  scale_factor="60" anchor_y="-100" anchor_z="20" attack_points="5" health_points="5">
 			<asset id="run" type="g3d" class="monster" path="data/bat_fly.g3d" speed="80"/>
 			<asset id="idle" type="g3d" class="monster" path="data/bat_hang.g3d"/>
 		</asset>
@@ -34,7 +37,7 @@
 			<asset id="collapse" type="g3d" class="back" path="data/tunnel_chasm_collapse.g3d"/>
 		</asset>
 		<asset id="pickaxe1" type="g3d" class="special" path="data/pick/pickaxe.G3D" scale_factor="30"/>
-		<asset id="player1" type="set" class="player"  scale_factor="50">
+		<asset id="player1" type="set" class="player"  scale_factor="50" attack_points="10" health_points="30">
 			<asset id="run" type="g3d" class="player" path="data/girl run v3.G3D" speed="250" animation_length="0.7"/>
 			<asset id="jump" type="g3d" class="player" path="data/girl jump.G3D" speed="150" animation_length="2"/>
 			<asset id="attack" type="g3d" class="player" path="data/girl attack.G3D" animation_length="0.7"/>
@@ -50,7 +53,7 @@
 			<asset id="idle" type="g3d" class="player" path="data/girlstand2.G3D"/>
 			<asset id="start" type="g3d" class="player" path="data/girl stand to run.G3D"/>
 		</asset>
-		<asset id="spider1" type="set" class="monster"  scale_factor="30">
+		<asset id="spider1" type="set" class="monster"  scale_factor="30" attack_points="10" health_points="20">
 			<asset id="idle" type="g3d" class="monster" path="data/spider1.g3d"/>
 			<asset id="run" type="g3d" class="monster" path="data/spider_run.g3d" speed="40"/>
 		</asset>

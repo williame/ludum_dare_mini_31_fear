@@ -78,7 +78,8 @@ private:
 		MODE_FLOOR,
 		MODE_CEILING,
 		MODE_HOT,
-		MODE_PLAY
+		MODE_SPLASH,
+		MODE_PLAY,
 	} mode;
 	xml_parser_t game_xml;
 	glm::vec2 screen_centre;
@@ -97,8 +98,10 @@ private:
 		hot_t(): type(BAD) {}
 		enum {
 			STOP,
+			SPECIAL,
 			BAD
 		} type;
+		object_t* special;
 	};
 	typedef std::vector<hot_t> hots_t;
 	hots_t hots;
@@ -170,6 +173,66 @@ protected:
 private:
 	rect_t _rect;
 	bool _bounds;
+};
+
+struct artwork_splash_t: public main_game_t::artwork_t, private main_t::texture_load_t {
+	artwork_splash_t(main_game_t& main,artwork_t* parent,const std::string& id_,const std::string& p,class_t c,float sf,float sp,
+		const glm::vec3& a,float al,float attack_points,float health_points):
+		artwork_t(main,parent,id_,p,c,sf,a,sp,al,attack_points,health_points),
+		path(p), texture(0) {
+			main.load_texture(path,this,0);
+		}
+	const std::string path;
+	GLuint texture;
+	void on_texture_loaded(const std::string& name,GLuint handle,intptr_t data) { 
+		texture = handle;
+		if(!is_ready())
+			data_error("could not load splash " << id << ':' << path);
+	}
+	bool is_ready() { return texture; }
+	void draw(float time,const glm::mat4& projection,const glm::mat4& modelview,const glm::vec3& light0,const glm::vec4& colour = glm::vec4(1,1,1,1)) {
+		if(!is_ready()) return;
+		const GLfloat data[4*2+4*2] = {
+			-1,-1,1,-1,-1,1,1,1,
+			0,1,1,1,0,0,1,0};
+		GLuint program = game.get_shared_program("splash"),
+			uniform_colour = game.get_uniform_loc(program,"COLOUR",GL_FLOAT_VEC4),
+			attrib_vertex = game.get_attribute_loc(program,"VERTEX",GL_FLOAT_VEC2),
+			attrib_tex = game.get_attribute_loc(program,"TEX_COORD_0",GL_FLOAT_VEC2),
+			vbo;
+		glUseProgram(program);
+		glUniform4fv(uniform_colour,1,glm::value_ptr(colour));
+		glCheck();
+		glGenBuffers(1,&vbo);
+		glBindBuffer(GL_ARRAY_BUFFER,vbo);
+		glBufferData(GL_ARRAY_BUFFER,sizeof(data),data,GL_STATIC_DRAW);
+		glEnableVertexAttribArray(attrib_vertex);
+		glEnableVertexAttribArray(attrib_tex);
+		glVertexAttribPointer(attrib_vertex,2,GL_FLOAT,GL_FALSE,0,0);
+		glVertexAttribPointer(attrib_tex,2,GL_FLOAT,GL_FALSE,0,(GLvoid*)(4*2*sizeof(GLfloat)));
+		glBindTexture(GL_TEXTURE_2D,texture);
+		glCheck();
+		glDrawArrays(GL_TRIANGLE_STRIP,0,4);
+		glDeleteBuffers(1,&vbo);
+		glCheck();
+	}
+	artwork_t* get_child(const std::string& id) { return this; }
+	void bounds(glm::vec3& min,glm::vec3& max) {
+		min = glm::vec3(-10000,-10000,-10000);
+		max = glm::vec3(10000,100000,100000);
+	}
+	void save(std::stringstream& xml) {
+		std::string indent = "\t\t";
+		for(const artwork_t* p=parent; p; p = p->parent)
+			indent += "\t";
+		xml << indent << "<asset id=\"" << id << "\" type=\"splash\" class=\"" <<
+			(cls == artwork_t::CLS_BACK?"back":
+			cls == artwork_t::CLS_PLAYER?"player":
+			cls == artwork_t::CLS_SPECIAL?"special":
+			cls == artwork_t::CLS_FRONT?"front":
+			cls == artwork_t::CLS_MONSTER?"monster":
+				"BUG") << "\" path=\"" << path << "\"/>";
+	}
 };
 
 struct artwork_set_t: public main_game_t::artwork_t {
@@ -326,6 +389,10 @@ main_game_t::artwork_t* main_game_t::load_asset(xml_walker_t& xml,artwork_t* par
 		const std::string path = xml.value_string("path");
 		std::cout << "loading G3D " << path << std::endl;
 		return new artwork_g3d_t(*this,parent,id,path,cls,scaler,speed,anchor,animation_length,attack_points,health_points);
+	} else if(type == "splash") {
+		const std::string path = xml.value_string("path");
+		std::cout << "loading splash " << path << std::endl;
+		return new artwork_splash_t(*this,parent,id,path,cls,scaler,speed,anchor,animation_length,attack_points,health_points);
 	} else if(type == "set") {
 		artwork_set_t* set = new artwork_set_t(*this,parent,id,cls,scaler,speed,anchor,animation_length,attack_points,health_points);
 		for(int i=0; xml.get_child("asset",i); i++, xml.up())
@@ -337,7 +404,8 @@ main_game_t::artwork_t* main_game_t::load_asset(xml_walker_t& xml,artwork_t* par
 
 struct main_game_t::object_t {
 	object_t(artwork_t& a,const glm::vec2& p):
-		artwork(a), pos(p), state(WALKING), attacking(false), waiting(true) {
+		artwork(a), pos(p), state(WALKING), attacking(false), waiting(true),
+		health_points(a.health_points), bury(false) {
 			dir[WALKING] = dir[JUMPING] = EDITOR;
 			action[WALKING] = action[JUMPING] = "idle";
 			active_artwork[WALKING] = active_artwork[JUMPING] = artwork.get_child("idle");
@@ -359,6 +427,7 @@ struct main_game_t::object_t {
 	bool attacking;
 	bool waiting;
 	double jump_gravity, jump_energy;
+	float health_points;
 	artwork_t* active_artwork[STATE_LAST];
 	double animation_start[STATE_LAST], speed[STATE_LAST];
 	std::string action[STATE_LAST];
@@ -376,8 +445,13 @@ struct main_game_t::object_t {
 	void draw(float time,const glm::mat4& projection,const glm::vec3& light0,const glm::vec4& colour = glm::vec4(1,1,1,1)) {
 		time -= animation_start[state];
 		if(time > active_artwork[state]->effective_animation_length()) { // time to change it then
-			active_artwork[state] = artwork.get_child(action[state]);
-			animation_start[state] = artwork.game.now_secs();
+			if(is_dead()) {
+				bury = true;
+				return;
+			} else {
+				active_artwork[state] = artwork.get_child(action[state]);
+				animation_start[state] = artwork.game.now_secs();
+			}
 		}
 		active_artwork[state]->draw(time,projection,tx(),light0,colour);		
 	}
@@ -397,6 +471,8 @@ struct main_game_t::object_t {
 		rect_t rect = active_artwork[state]->rect();
 		return rect_t(rect.bl+pos,rect.tr+pos);
 	}
+	bool is_dead() const { return (health_points <= 0) && artwork.health_points; }
+	bool bury;
 };
 
 void rect_t::draw(main_t& main,const glm::mat4& mvp,glm::vec4 colour) {
@@ -470,6 +546,15 @@ void main_game_t::on_ready(artwork_t*) {
 			if(artwork.find(asset) == artwork.end())
 				data_error("unresolved asset ID " << asset);
 			objects.push_back(new object_t(*artwork[asset],glm::vec2(x,y)));
+			if(artwork[asset]->cls == artwork_t::CLS_SPECIAL) {
+				new_hot.type = hot_t::SPECIAL;
+				new_hot.special = objects.back();
+				rect_t r = new_hot.special->effective_rect();
+				new_hot.bl = r.bl;
+				new_hot.tr = r.tr;
+				new_hot.normalise();
+				hots.push_back(new_hot);
+			}
 		}
 		for(int i=0; xml.get_child("hot",i); i++, xml.up()) {
 			new_hot.bl.x = xml.value_float("x1");
@@ -497,11 +582,12 @@ void main_game_t::on_ready(artwork_t*) {
 }
 
 bool main_game_t::tick() {
-	static double first_tick = now_secs(), last_tick;
-	const double now = this->now_secs(),
-		elapsed = now-first_tick,
-		since_last = now-last_tick;
-	if(mode == MODE_PLAY) {
+	static double last_tick = now_secs();
+	const double now = now_secs(), since_last = now-last_tick;
+	if(mode == MODE_SPLASH) {
+		artwork["SPLASH"]->draw(now,glm::mat4(),glm::mat4(),glm::vec3(),glm::vec4(1,1,1,1));
+		return true;
+	} else if(mode == MODE_PLAY) {
 		play_tick(since_last);
 		screen_centre = player->pos + player->artwork.rect().centre();
 	} else
@@ -513,17 +599,21 @@ bool main_game_t::tick() {
 		screen.bl.y,screen.tr.y, // y increases upwards
 		1,300));
 	const glm::vec3 light0(10,10,10);
+	if(mode == MODE_PLAY && player->is_dead() && player->bury) {
+		artwork_t* lose = artwork["LOSE"];
+		lose->draw(now,projection,lose->tx,light0);
+	}
 	// show all the objects
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++) {
 		if((*i)->is_visible(screen))
 			(*i)->draw(now,projection,light0);
-		if((*i)->attacking)
-			(*i)->effective_rect().draw(*this,projection,glm::vec4(1,0,0,1));
+		//if((*i)->attacking)
+		//	(*i)->effective_rect().draw(*this,projection,glm::vec4(1,0,0,1));
 	}
 	if(mode != MODE_PLAY) {
 		// show active model on top for editing
 		if((mode == MODE_PLACE_OBJECT) && active_model && mouse_down) {
-			active_model->draw(elapsed,projection,
+			active_model->draw(now,projection,
 				glm::translate(glm::vec3(screen_centre.x+mouse_x-width/2,screen_centre.y-mouse_y+height/2,-50))*
 					active_model->tx,
 				light0,glm::vec4(1,.6,.6,.6));
@@ -544,6 +634,7 @@ bool main_game_t::tick() {
 }
 
 void main_game_t::play_tick(float step) {
+	if(player->is_dead()) return;
 	// move main player
 	{
 		glm::vec2 move(player->speed[player->state] * step * player->dir[player->state],0),
@@ -587,7 +678,6 @@ void main_game_t::play_tick(float step) {
 	// move all monsters
 	const float attack_overlap = 20;
 	const rect_t player_rect(player->effective_rect().shrink(glm::vec2(attack_overlap,0)));
-	bool attacked = false;
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
 		if((*i)->artwork.cls == artwork_t::CLS_MONSTER) {
 			object_t& monster = **i;
@@ -608,9 +698,10 @@ void main_game_t::play_tick(float step) {
 				}
 				if(monster.effective_rect().shrink(glm::vec2(attack_overlap,0)).intersects(player_rect)) {
 					run = false;
-					attacked = true;
 					monster.attacking = true;
 					monster.set_action(monster.state,"attack");
+					player->health_points -= monster.artwork.attack_points * step;
+					//std::cout << "monster " << monster.artwork.id << " hit you, " << player->health_points << std::endl;
 				} else if(run) {
 					monster.set_action(monster.state,"run");
 					const float speed = monster.active_artwork[monster.state]->speed;
@@ -619,10 +710,16 @@ void main_game_t::play_tick(float step) {
 				} else
 					monster.set_action(monster.state,"idle");
 				if(monster.attacking && player->attacking &&
-					((player->pos.x > monster.pos.x) == (player->dir[object_t::WALKING] == object_t::LEFT)))
-					std::cout << "you hit monster " << monster.artwork.id << std::endl;
+					((player->pos.x > monster.pos.x) == (player->dir[object_t::WALKING] == object_t::LEFT))) {
+					monster.health_points -= player->artwork.attack_points * step;
+					//std::cout << "you hit monster " << monster.artwork.id << ", " << monster.health_points << std::endl;
+					//if(monster.health_points <= 0)
+					//	std::cout << "monster " << monster.artwork.id << " dies" << std::endl;
+				}
 			}
 		}
+	if(player->is_dead())
+		player->set_action(player->state,"die");
 }
 
 void main_game_t::save() {
@@ -681,14 +778,17 @@ void main_game_t::play() {
 		std::cerr << "The player cannot move!  Add a speed= parameter to the xml!" << std::endl;
 		return;
 	}
-	mode = MODE_PLAY;
+	mode = MODE_SPLASH;
 	pan_rate = glm::vec2(0,0);
 	glClearColor(0,0,0,1);
 	std::cout << "Playing game!" << std::endl;
 }
 
 bool main_game_t::on_key_down(short code) {
-	if(mode == MODE_PLAY) {
+	if(mode == MODE_SPLASH) {
+		mode = MODE_PLAY;
+		return true;
+	} else if(mode == MODE_PLAY) {
 		switch(code) {
 		case KEY_UP:
 			if(player->state == object_t::WALKING) {
@@ -851,6 +951,9 @@ bool main_game_t::on_mouse_down(int x,int y,mouse_button_t button) {
 	mouse_y = y;
 	const int mapped_x = screen_centre.x+mouse_x-width/2, mapped_y = screen_centre.y-mouse_y+height/2;
 	switch(mode) {
+	case MODE_SPLASH:
+		mode = MODE_PLAY;
+		return true;
 	case MODE_EDIT_OBJECT:
 		if(button == MOUSE_DRAG) {
 			if(active_object) {

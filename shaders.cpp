@@ -61,5 +61,20 @@ void create_shaders(main_t& main) {
 			"void main() {\n"
 			"	gl_FragColor = COLOUR;\n"
 			"}\n"));
+	main.set_shared_program("splash",main.create_program(
+			"attribute vec2 VERTEX;\n"
+			"attribute vec2 TEX_COORD_0;\n"
+			"varying vec2 tex_coord_0;\n"
+			"void main() {\n"
+			"	gl_Position = vec4(VERTEX,-1.,1.);\n"
+			"	tex_coord_0 = TEX_COORD_0;\n"
+			"}\n",
+			"uniform vec4 COLOUR;\n"
+			"uniform sampler2D TEX_UNIT_0;\n"
+			"varying vec2 tex_coord_0;\n"
+			"void main() {\n"
+			"	vec3 texel = texture2D(TEX_UNIT_0,tex_coord_0).rgb;\n"
+			"	gl_FragColor = vec4(texel*COLOUR.rgb,COLOUR.a);\n"
+			"}\n"));
 }
 
