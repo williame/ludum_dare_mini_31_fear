@@ -1,54 +1,54 @@
 <game>
 	<artwork>
-		<asset id="b01" type="g3d" class="back" path="data/tunnel_back1.g3d" scale_factor="30"/>
-		<asset id="b02" type="g3d" class="back" path="data/tunnel_back2.g3d" scale_factor="30"/>
-		<asset id="b03" type="g3d" class="back" path="data/tunnel_back3.g3d" scale_factor="30"/>
-		<asset id="b04" type="g3d" class="back" path="data/tunnel_back4.g3d" scale_factor="30"/>
-		<asset id="b05" type="g3d" class="back" path="data/tunnel_back5.g3d" scale_factor="30"/>
-		<asset id="b06" type="g3d" class="back" path="data/tunnel_back6.g3d" scale_factor="30"/>
-		<asset id="b07" type="g3d" class="back" path="data/tunnel_portcullis_closed.g3d" scale_factor="30"/>
-		<asset id="b08" type="g3d" class="back" path="data/tunnel_portcullis_open.g3d" scale_factor="30"/>
-		<asset id="b09" type="g3d" class="back" path="data/tunnel_updown.g3d" scale_factor="30"/>
-		<asset id="b10" type="g3d" class="back" path="data/tunnel_back_fork1_closed.g3d" scale_factor="30"/>
-		<asset id="b11" type="g3d" class="back" path="data/tunnel_back_fork1_open.g3d" scale_factor="30"/>
-		<asset id="b12" type="g3d" class="back" path="data/tunnel_chasm.g3d" scale_factor="30"/>
-		<asset id="b13" type="g3d" class="back" path="data/tunnel_chasm_collapse.g3d" scale_factor="30"/>
-		<asset id="b14" type="g3d" class="back" path="data/ladder.g3d" scale_factor="30"/>
-		<asset id="b15" type="g3d" class="back" path="data/tunnel_end_left.g3d" scale_factor="30"/>
-		<asset id="b16" type="g3d" class="back" path="data/tunnel_end_right.g3d" scale_factor="30"/>
-		<asset id="b17" type="g3d" class="back" path="data/tunnel_updown2.g3d" scale_factor="30"/>
-		<asset id="balrog1" type="set" class="monster" scale_factor="30" speed="1">
-			<asset id="pitfall" type="g3d" class="monster" path="data/ballrog pitfall.G3D"/>
-			<asset id="attack" type="g3d" class="monster" path="data/balrog attack.G3D"/>
-			<asset id="idle" type="g3d" class="monster" path="data/balrog fireball idle.G3D"/>
-			<asset id="idle" type="g3d" class="monster" path="data/balrog idle.G3D"/>
-			<asset id="start" type="g3d" class="monster" path="data/balrog idle to walk.G3D"/>
-			<asset id="run" type="g3d" class="monster" path="data/balrog walk.G3D"/>
-			<asset id="stop" type="g3d" class="monster" path="data/balrog walk to idle.G3D"/>
+		<asset id="b01" type="g3d" class="back" path="data/tunnel_back1.g3d" scale_factor="30" speed="1"/>
+		<asset id="b02" type="g3d" class="back" path="data/tunnel_back2.g3d" scale_factor="30" speed="1"/>
+		<asset id="b03" type="g3d" class="back" path="data/tunnel_back3.g3d" scale_factor="30" speed="1"/>
+		<asset id="b04" type="g3d" class="back" path="data/tunnel_back4.g3d" scale_factor="30" speed="1"/>
+		<asset id="b05" type="g3d" class="back" path="data/tunnel_back5.g3d" scale_factor="30" speed="1"/>
+		<asset id="b06" type="g3d" class="back" path="data/tunnel_back6.g3d" scale_factor="30" speed="1"/>
+		<asset id="b07" type="g3d" class="back" path="data/tunnel_portcullis_closed.g3d" scale_factor="30" speed="1"/>
+		<asset id="b08" type="g3d" class="back" path="data/tunnel_portcullis_open.g3d" scale_factor="30" speed="1"/>
+		<asset id="b09" type="g3d" class="back" path="data/tunnel_updown.g3d" scale_factor="30" speed="1"/>
+		<asset id="b10" type="g3d" class="back" path="data/tunnel_back_fork1_closed.g3d" scale_factor="30" speed="1"/>
+		<asset id="b11" type="g3d" class="back" path="data/tunnel_back_fork1_open.g3d" scale_factor="30" speed="1"/>
+		<asset id="b12" type="g3d" class="back" path="data/tunnel_chasm.g3d" scale_factor="30" speed="1"/>
+		<asset id="b13" type="g3d" class="back" path="data/tunnel_chasm_collapse.g3d" scale_factor="30" speed="1"/>
+		<asset id="b14" type="g3d" class="back" path="data/ladder.g3d" scale_factor="30" speed="1"/>
+		<asset id="b15" type="g3d" class="back" path="data/tunnel_end_left.g3d" scale_factor="30" speed="1"/>
+		<asset id="b16" type="g3d" class="back" path="data/tunnel_end_right.g3d" scale_factor="30" speed="1"/>
+		<asset id="b17" type="g3d" class="back" path="data/tunnel_updown2.g3d" scale_factor="30" speed="1"/>
+		<asset id="balrog1" type="set" class="monster"  scale_factor="30">
+		<asset id="pitfall" type="g3d" class="monster" path="data/ballrog pitfall.G3D" scale_factor="1" speed="1"/>
+		<asset id="attack" type="g3d" class="monster" path="data/balrog attack.G3D" scale_factor="1" speed="1"/>
+		<asset id="idle" type="g3d" class="monster" path="data/balrog fireball idle.G3D" scale_factor="1" speed="1"/>
+		<asset id="idle" type="g3d" class="monster" path="data/balrog idle.G3D" scale_factor="1" speed="1"/>
+		<asset id="start" type="g3d" class="monster" path="data/balrog idle to walk.G3D" scale_factor="1" speed="1"/>
+		<asset id="run" type="g3d" class="monster" path="data/balrog walk.G3D" scale_factor="1" speed="1"/>
+		<asset id="stop" type="g3d" class="monster" path="data/balrog walk to idle.G3D" scale_factor="1" speed="1"/>
 		</asset>
-		<asset id="bat1" type="set" class="monster" scale_factor="60" speed="1" anchor_y="-100" anchor_z="20">
-			<asset id="run" type="g3d" class="monster" path="data/bat_fly.g3d"speed="80"/>
-			<asset id="idle" type="g3d" class="monster" path="data/bat_hang.g3d"/>
+		<asset id="bat1" type="set" class="monster"  scale_factor="60" anchor_y="-100" anchor_z="20">
+		<asset id="run" type="g3d" class="monster" path="data/bat_fly.g3d" scale_factor="1" speed="80" speed="80"/>
+		<asset id="idle" type="g3d" class="monster" path="data/bat_hang.g3d" scale_factor="1" speed="1"/>
 		</asset>
-		<asset id="player1" type="set" class="player" scale_factor="50" speed="1">
-			<asset id="run" type="g3d" class="player" path="data/girl run v3.G3D" speed="250" animation_length="0.7"/>
-			<asset id="jump" type="g3d" class="player" path="data/girl jump.G3D"  speed="150" animation_length="2"/>
-			<asset id="attack" type="g3d" class="player" path="data/girl attack.G3D" animation_length="0.7"/>
-			<asset id="attack" type="g3d" class="player" path="data/girl attack v2.G3D" animation_length="0.7"/>
-			<asset id="jump_attack" type="g3d" class="player" path="data/girl jump attack.G3D" speed="150" animation_length="0.7"/>
-			<asset id="climb" type="g3d" class="player" path="data/girl climb.G3D"/>
-			<asset id="pickaxe" type="g3d" class="player" path="data/girl pickaxe.G3D"/>
-			<asset id="die" type="g3d" class="player" path="data/girldie.G3D" />
-			<asset id="run" type="g3d" class="player" path="data/girl rum v2.G3D" speed="250" animation_length="0.7"/>
-			<asset id="run" type="g3d" class="player" path="data/girl run.G3D" speed="250" animation_length="0.7"/>
-			<asset id="stop" type="g3d" class="player" path="data/girl run to stand.G3D"/>
-			<asset id="idle" type="g3d" class="player" path="data/girlstand1.G3D"/>
-			<asset id="idle" type="g3d" class="player" path="data/girlstand2.G3D"/>
-			<asset id="start" type="g3d" class="player" path="data/girl stand to run.G3D"/>
+		<asset id="player1" type="set" class="player"  scale_factor="50">
+		<asset id="run" type="g3d" class="player" path="data/girl run v3.G3D" scale_factor="1" speed="250" speed="250" animation_length="0.7"/>
+		<asset id="jump" type="g3d" class="player" path="data/girl jump.G3D" scale_factor="1" speed="150" speed="150" animation_length="2"/>
+		<asset id="attack" type="g3d" class="player" path="data/girl attack.G3D" scale_factor="1" speed="1" animation_length="0.7"/>
+		<asset id="attack" type="g3d" class="player" path="data/girl attack v2.G3D" scale_factor="1" speed="1" animation_length="0.7"/>
+		<asset id="jump_attack" type="g3d" class="player" path="data/girl jump attack.G3D" scale_factor="1" speed="150" speed="150" animation_length="0.7"/>
+		<asset id="climb" type="g3d" class="player" path="data/girl climb.G3D" scale_factor="1" speed="1"/>
+		<asset id="pickaxe" type="g3d" class="player" path="data/girl pickaxe.G3D" scale_factor="1" speed="1"/>
+		<asset id="die" type="g3d" class="player" path="data/girldie.G3D" scale_factor="1" speed="1"/>
+		<asset id="run" type="g3d" class="player" path="data/girl rum v2.G3D" scale_factor="1" speed="250" speed="250" animation_length="0.7"/>
+		<asset id="run" type="g3d" class="player" path="data/girl run.G3D" scale_factor="1" speed="250" speed="250" animation_length="0.7"/>
+		<asset id="stop" type="g3d" class="player" path="data/girl run to stand.G3D" scale_factor="1" speed="1"/>
+		<asset id="idle" type="g3d" class="player" path="data/girlstand1.G3D" scale_factor="1" speed="1"/>
+		<asset id="idle" type="g3d" class="player" path="data/girlstand2.G3D" scale_factor="1" speed="1"/>
+		<asset id="start" type="g3d" class="player" path="data/girl stand to run.G3D" scale_factor="1" speed="1"/>
 		</asset>
-		<asset id="spider1" type="set" class="monster" scale_factor="30" speed="1">
-			<asset id="idle" type="g3d" class="monster" path="data/spider1.g3d"/>
-			<asset id="run" type="g3d" class="monster" path="data/spider_run.g3d" speed="40"/>
+		<asset id="spider1" type="set" class="monster"  scale_factor="30">
+		<asset id="idle" type="g3d" class="monster" path="data/spider1.g3d" scale_factor="1" speed="1"/>
+		<asset id="run" type="g3d" class="monster" path="data/spider_run.g3d" scale_factor="1" speed="40" speed="40"/>
 		</asset>
 	</artwork>
 	<level>

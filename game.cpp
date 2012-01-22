@@ -135,6 +135,14 @@ struct main_game_t::artwork_t {
 				mx = tx*glm::vec4(max,1.);
 			_rect.bl = glm::vec2(mn.x-anchor.x,mn.y-anchor.y);
 			_rect.tr = glm::vec2(mx.x-anchor.x,mx.y-anchor.y);
+			const artwork_t* p = parent;
+			while(p) {
+				_rect.bl.x -= p->anchor.x;
+				_rect.tr.x -= p->anchor.x;
+				_rect.tr.y -= p->anchor.y;
+				_rect.bl.y -= p->anchor.y;
+				p = p->parent;
+			}
 			_rect.normalise();
 			_bounds = true;
 		}
@@ -277,8 +285,8 @@ main_game_t::artwork_t* main_game_t::load_asset(xml_walker_t& xml,artwork_t* par
 		xml.has_key("anchor_x")? xml.value_float("anchor_x"):0,
 		xml.has_key("anchor_y")? xml.value_float("anchor_y"):0,
 		xml.has_key("anchor_z")? xml.value_float("anchor_z"):0);
-	const float scaler = (xml.has_key("scale_factor")? xml.value_float("scale_factor"):1.0)*sf;
-	const float speed = (xml.has_key("speed")? xml.value_float("speed"):0) * sp;
+	const float scaler = (xml.has_key("scale_factor")? xml.value_float("scale_factor"):1)*sf;
+	const float speed = (xml.has_key("speed")? xml.value_float("speed"):1) * sp;
 	const float animation_length = xml.has_key("animation_length")? xml.value_float("animation_length"): 0;
 	if(type == "g3d") {
 		const std::string path = xml.value_string("path");
@@ -351,6 +359,7 @@ struct main_game_t::object_t {
 		return screen.intersects(effective_rect());
 	}
 	rect_t effective_rect() const {
+		const glm::vec2 anchor(artwork.anchor.x,pos.y-artwork.anchor.y);
 		rect_t rect = active_artwork[state]->rect();
 		return rect_t(rect.bl+pos,rect.tr+pos);
 	}
@@ -449,7 +458,7 @@ void main_game_t::on_ready(artwork_t*) {
 		glClearColor(1,1,1,1);
 		
 		//###
-		play();
+		//play();
 	}
 }
 
