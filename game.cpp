@@ -607,7 +607,7 @@ void main_game_t::on_ready(artwork_t*) {
 		glClearColor(1,1,1,1);
 		
 		//###
-		//play();
+		play();
 	}
 }
 
@@ -656,7 +656,7 @@ bool main_game_t::tick() {
 		objects.erase(std::find(objects.begin(),objects.end(),*i));
 		delete *i;
 	}
-	if(true) { //### mode != MODE_PLAY) {
+	if(mode != MODE_PLAY) {
 		// show active model on top for editing
 		if((mode == MODE_PLACE_OBJECT) && active_model && mouse_down) {
 			active_model->draw(now,projection,
