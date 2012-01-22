@@ -801,6 +801,7 @@ bool main_game_t::on_key_down(short code) {
 		mode = MODE_PLAY;
 		return true;
 	} else if(mode == MODE_PLAY) {
+		if(player->is_dead()) return true;
 		switch(code) {
 		case KEY_UP:
 			if(player->state == object_t::WALKING) {
@@ -889,6 +890,7 @@ bool main_game_t::on_key_down(short code) {
 
 bool main_game_t::on_key_up(short code) {
 	if(mode == MODE_PLAY) {
+		if(player->is_dead()) return true;
 		switch(code) {
 		case KEY_UP:
 			player->jump_energy *= 0.6; // stop them jumping full-apogee
