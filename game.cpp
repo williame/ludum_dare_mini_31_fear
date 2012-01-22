@@ -577,7 +577,7 @@ void main_game_t::on_ready(artwork_t*) {
 		glClearColor(1,1,1,1);
 		
 		//###
-		//play();
+		play();
 	}
 }
 
@@ -604,11 +604,18 @@ bool main_game_t::tick() {
 		lose->draw(now,projection,lose->tx,light0);
 	}
 	// show all the objects
+	objects_t reap;
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++) {
 		if((*i)->is_visible(screen))
 			(*i)->draw(now,projection,light0);
 		//if((*i)->attacking)
 		//	(*i)->effective_rect().draw(*this,projection,glm::vec4(1,0,0,1));
+		if((mode == MODE_PLAY) && (*i)->is_dead() && (*i)->bury && *i!=player)
+			reap.push_back(*i);
+	}
+	for(objects_t::iterator i=reap.begin(); i!=reap.end(); i++) {
+		objects.erase(std::find(objects.begin(),objects.end(),*i));
+		delete *i;
 	}
 	if(mode != MODE_PLAY) {
 		// show active model on top for editing
@@ -681,6 +688,7 @@ void main_game_t::play_tick(float step) {
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
 		if((*i)->artwork.cls == artwork_t::CLS_MONSTER) {
 			object_t& monster = **i;
+			if(monster.is_dead()) continue;
 			if(monster.waiting) {
 				if(monster.is_visible(screen)) {
 					monster.waiting = false;
@@ -701,7 +709,7 @@ void main_game_t::play_tick(float step) {
 					monster.attacking = true;
 					monster.set_action(monster.state,"attack");
 					player->health_points -= monster.artwork.attack_points * step;
-					//std::cout << "monster " << monster.artwork.id << " hit you, " << player->health_points << std::endl;
+					std::cout << "monster " << monster.artwork.id << " hit you, " << player->health_points << std::endl;
 				} else if(run) {
 					monster.set_action(monster.state,"run");
 					const float speed = monster.active_artwork[monster.state]->speed;
@@ -712,14 +720,18 @@ void main_game_t::play_tick(float step) {
 				if(monster.attacking && player->attacking &&
 					((player->pos.x > monster.pos.x) == (player->dir[object_t::WALKING] == object_t::LEFT))) {
 					monster.health_points -= player->artwork.attack_points * step;
-					//std::cout << "you hit monster " << monster.artwork.id << ", " << monster.health_points << std::endl;
-					//if(monster.health_points <= 0)
-					//	std::cout << "monster " << monster.artwork.id << " dies" << std::endl;
+					std::cout << "you hit monster " << monster.artwork.id << ", " << monster.health_points << std::endl;
+					if(monster.is_dead()) {
+						std::cout << "monster " << monster.artwork.id << " dies" << std::endl;
+						monster.set_action(player->state,"die");
+					}
 				}
 			}
 		}
-	if(player->is_dead())
+	if(player->is_dead()) {
+		std::cout << "player dies!" << std::endl;
 		player->set_action(player->state,"die");
+	}
 }
 
 void main_game_t::save() {
