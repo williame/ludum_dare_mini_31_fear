@@ -25,10 +25,10 @@ public:
 	bool tick();
 	void on_io(const std::string& name,bool ok,const std::string& bytes,intptr_t data);
 	// debug just print state
-	bool on_key_down(short code,const input_key_map_t& map,const input_mouse_map_t& mouse);
-	bool on_key_up(short code,const input_key_map_t& map,const input_mouse_map_t& mouse);
-	bool on_mouse_down(int x,int y,mouse_button_t button,const input_key_map_t& map,const input_mouse_map_t& mouse);
-	bool on_mouse_up(int x,int y,mouse_button_t button,const input_key_map_t& map,const input_mouse_map_t& mouse);
+	bool on_key_down(short code);
+	bool on_key_up(short code);
+	bool on_mouse_down(int x,int y,mouse_button_t button);
+	bool on_mouse_up(int x,int y,mouse_button_t button);
 	struct artwork_t;
 private:
 	friend struct artwork_t;
@@ -99,7 +99,7 @@ struct main_game_t::artwork_t {
 	};
 	virtual ~artwork_t() {}
 	main_game_t& game;
-	const std::string id;
+	const std::string id, name;
 	const class_t cls;
 	const glm::mat4 tx;
 	const glm::vec4 anchor;
@@ -114,8 +114,8 @@ protected:
 		if(!ok) data_error("failed to load " << id);
 		game.on_ready(this);
 	}
-	artwork_t(main_game_t& g,const std::string& id_,class_t c,float sf,const glm::vec3& a,float sp):
-		game(g), id(id_), cls(c),
+	artwork_t(main_game_t& g,const std::string& id_,const std::string& n,class_t c,float sf,const glm::vec3& a,float sp):
+		game(g), id(id_), name(n), cls(c),
 		tx(glm::scale(glm::vec3(sf,sf,sf))),
 		anchor(glm::scale(glm::vec3(sf,sf,sf))*glm::vec4(a,1)),
 		scale_factor(sf), speed(sp) {}
@@ -123,7 +123,7 @@ protected:
 
 struct artwork_set_t: public main_game_t::artwork_t {
 	artwork_set_t(main_game_t& main,const std::string& id_,class_t c,float sf,float sp,const glm::vec3& a):
-		artwork_t(main,id_,c,sf,a,sp) {}
+		artwork_t(main,id_,id_,c,sf,a,sp) {}
 	~artwork_set_t() {
 		for(artworks_t::iterator i=artwork.begin(); i!=artwork.end(); i++)
 			delete *i;
@@ -182,7 +182,7 @@ struct artwork_set_t: public main_game_t::artwork_t {
 
 struct artwork_g3d_t: public main_game_t::artwork_t, private g3d_t::loaded_t {
 	artwork_g3d_t(main_game_t& main,const std::string& id_,const std::string& p,class_t c,float sf,float sp,const glm::vec3& a,float al):
-		artwork_t(main,id_,c,sf,a,sp),
+		artwork_t(main,id_,p,c,sf,a,sp),
 		path(p), animation_length(al),
 		g3d(main,p,this), _ready(false) {}
 	const std::string path;
@@ -253,10 +253,12 @@ main_game_t::artwork_t* main_game_t::load_asset(xml_walker_t& xml,float sf,float
 
 struct main_game_t::object_t {
 	object_t(artwork_t& a,const glm::vec2& p):
-		artwork(a), pos(p), state(WALKING), animation_start(a.game.now_secs()) {
+		artwork(a), pos(p), state(WALKING) {
 			dir[WALKING] = dir[JUMPING] = EDITOR;
-			active_artwork[WALKING] = active_artwork[JUMPING] = a.get_child("idle");
+			action[WALKING] = action[JUMPING] = "idle";
+			active_artwork[WALKING] = active_artwork[JUMPING] = artwork.get_child("idle");
 			speed[WALKING] = speed[JUMPING] = 0;
+			animation_start[WALKING] = animation_start[JUMPING] = artwork.game.now_secs();
 		}
 	artwork_t& artwork;
 	glm::vec2 pos;
@@ -272,17 +274,23 @@ struct main_game_t::object_t {
 	} dir[STATE_LAST];
 	double jump_gravity, jump_energy;
 	artwork_t* active_artwork[STATE_LAST];
-	double animation_start, speed[STATE_LAST];
+	double animation_start[STATE_LAST], speed[STATE_LAST];
+	std::string action[STATE_LAST];
 	void set_action(state_t state,const std::string& action) {
-		if(action == active_artwork[state]->id) return;
+		if(action == this->action[state]) return;
+		this->action[state] = action;
 		active_artwork[state] = artwork.get_child(action);
-		animation_start = artwork.game.now_secs();
+	}
+	void set_state(state_t state) {
+		if(state == this->state) return;
+		this->state = state;
+		animation_start[state] = artwork.game.now_secs();
 	}
 	glm::mat4 tx() {
 		glm::mat4 tx(glm::translate(glm::vec3(pos,-artwork.cls))*artwork.tx);
-		if(dir[state] == LEFT)
+		if(dir[WALKING] == LEFT) // WALKING defines facing, even if completing a jump in another direction
 			tx *= glm::rotate(270.0f,glm::vec3(0,1,0));
-		else if(dir[state] == RIGHT)
+		else if(dir[WALKING] == RIGHT)
 			tx *= glm::rotate(90.0f,glm::vec3(0,1,0));
 		return tx;
 	}
@@ -399,7 +407,7 @@ bool main_game_t::tick() {
 	const glm::vec3 light0(10,10,10);
 	// show all the objects
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
-		(*i)->active_artwork[(*i)->state]->draw(now-(*i)->animation_start,projection,(*i)->tx(),light0);
+		(*i)->active_artwork[(*i)->state]->draw(now-(*i)->animation_start[(*i)->state],projection,(*i)->tx(),light0);
 	if(mode != MODE_PLAY) {
 		// show active model on top for editing
 		if((mode == MODE_PLACE_OBJECT) && active_model && mouse_down) {
@@ -434,13 +442,16 @@ void main_game_t::play_tick(float step) {
 			const double jump_up = player->jump_energy*step - player->jump_gravity;
 			if(jump_up+player_pos.y < floor_y) {
 				move.y = floor_y-player_pos.y;
-				player->state = object_t::WALKING;
-				player->set_action(player->state,player->speed[player->state]>0?"run":"idle");
+				player->set_state(object_t::WALKING);
+				if(keys()[KEY_UP]) // still pressed? jump again
+					on_key_down(KEY_UP);
+				else
+					player->set_action(player->state,player->speed[player->state]?"run":"idle");
 			} else
 				move.y = jump_up;
 		} else {
 			assert(player->state == object_t::WALKING);
-			player->set_action(player->state,move.x>0?"run":"idle");
+			player->set_action(player->state,move.x?"run":"idle");
 			move.y = floor_y-player_pos.y;
 		}
 	} else // else path says stop; play a bump sound?
@@ -517,7 +528,7 @@ void main_game_t::play() {
 	std::cout << "Playing game!" << std::endl;
 }
 
-bool main_game_t::on_key_down(short code,const input_key_map_t& map,const input_mouse_map_t& mouse) {
+bool main_game_t::on_key_down(short code) {
 	if(mode == MODE_PLAY) {
 		switch(code) {
 		case KEY_UP:
@@ -526,18 +537,18 @@ bool main_game_t::on_key_down(short code,const input_key_map_t& map,const input_
 				player->jump_energy = 160;
 				player->dir[object_t::JUMPING] = player->dir[object_t::WALKING];
 				player->speed[object_t::JUMPING] = player->speed[object_t::WALKING];
-				player->state = object_t::JUMPING;
+				player->set_state(object_t::JUMPING);
 				player->set_action(player->state,"jump");
 			}
 			break;
 		case KEY_LEFT:
-			if(map[KEY_RIGHT]) break;
+			if(keys()[KEY_RIGHT]) break;
 			player->set_action(object_t::WALKING,"run");
 			player->speed[object_t::WALKING] = player->active_artwork[object_t::WALKING]->speed;
 			player->dir[object_t::WALKING] = object_t::LEFT;
 			break;
 		case KEY_RIGHT:
-			if(map[KEY_LEFT]) break;
+			if(keys()[KEY_LEFT]) break;
 			player->set_action(object_t::WALKING,"run");
 			player->speed[object_t::WALKING] = player->active_artwork[object_t::WALKING]->speed;
 			player->dir[object_t::WALKING] = object_t::RIGHT;
@@ -584,34 +595,36 @@ bool main_game_t::on_key_down(short code,const input_key_map_t& map,const input_
 		case MODE_EDIT_OBJECT:
 			return false;
 		case MODE_FLOOR:
-			return floor->on_key_down(code,map,mouse);
+			return floor->on_key_down(code,keys(),mouse());
 		case MODE_CEILING:
-			return ceiling->on_key_down(code,map,mouse);
+			return ceiling->on_key_down(code,keys(),mouse());
 		default: return false;
 		}		
 	}
 }
 
-bool main_game_t::on_key_up(short code,const input_key_map_t& map,const input_mouse_map_t& mouse) {
+bool main_game_t::on_key_up(short code) {
 	if(mode == MODE_PLAY) {
 		switch(code) {
 		case KEY_UP:
 			player->jump_energy *= 0.6; // stop them jumping full-apogee
 			break;
 		case KEY_LEFT:
-			if(map[KEY_RIGHT])
-				on_key_down(KEY_RIGHT,map,mouse);
+			if(keys()[KEY_RIGHT])
+				on_key_down(KEY_RIGHT);
 			else {
 				player->set_action(object_t::WALKING,"idle");
 				player->speed[object_t::WALKING] = 0;
+				player->animation_start[object_t::WALKING] = now_secs();
 			}
 			break;
 		case KEY_RIGHT:
-			if(map[KEY_LEFT])
-				on_key_down(KEY_LEFT,map,mouse);
+			if(keys()[KEY_LEFT])
+				on_key_down(KEY_LEFT);
 			else {
 				player->set_action(object_t::WALKING,"idle");
 				player->speed[object_t::WALKING] = 0;
+				player->animation_start[object_t::WALKING] = now_secs();
 			}
 			break;
 		default:;
@@ -623,7 +636,7 @@ bool main_game_t::on_key_up(short code,const input_key_map_t& map,const input_mo
 	case KEY_RIGHT: pan_rate.x = 0; return true;
 	case KEY_UP:
 	case KEY_DOWN: pan_rate.y = 0; return true;
-	case 's': if(map.none()) save(); return true;
+	case 's': if(keys().none()) save(); return true;
 	default:
 		switch(mode) {
 		case MODE_EDIT_OBJECT:
@@ -638,9 +651,9 @@ bool main_game_t::on_key_up(short code,const input_key_map_t& map,const input_mo
 			}
 			return false;
 		case MODE_FLOOR:
-			return floor->on_key_up(code,map,mouse);
+			return floor->on_key_up(code,keys(),mouse());
 		case MODE_CEILING:
-			return ceiling->on_key_up(code,map,mouse);
+			return ceiling->on_key_up(code,keys(),mouse());
 		case MODE_HOT:
 			if(mouse_down || !draw_hot) return false;
 			switch(code) {
@@ -660,7 +673,7 @@ bool main_game_t::on_key_up(short code,const input_key_map_t& map,const input_mo
 	}
 }
 
-bool main_game_t::on_mouse_down(int x,int y,mouse_button_t button,const input_key_map_t& map,const input_mouse_map_t& mouse) {
+bool main_game_t::on_mouse_down(int x,int y,mouse_button_t button) {
 	mouse_down = true;
 	mouse_x = x;
 	mouse_y = y;
@@ -696,10 +709,10 @@ bool main_game_t::on_mouse_down(int x,int y,mouse_button_t button,const input_ke
 		}
 		break;
 	case MODE_FLOOR:
-		floor->on_mouse_down(mapped_x,mapped_y,button,map,mouse);
+		floor->on_mouse_down(mapped_x,mapped_y,button,keys(),mouse());
 		break;
 	case MODE_CEILING:
-		ceiling->on_mouse_down(mapped_x,mapped_y,button,map,mouse);
+		ceiling->on_mouse_down(mapped_x,mapped_y,button,keys(),mouse());
 		break;
 	case MODE_HOT:
 		if(!draw_hot)
@@ -712,7 +725,7 @@ bool main_game_t::on_mouse_down(int x,int y,mouse_button_t button,const input_ke
 	return true;
 }
 
-bool main_game_t::on_mouse_up(int x,int y,mouse_button_t button,const input_key_map_t& map,const input_mouse_map_t& mouse) {
+bool main_game_t::on_mouse_up(int x,int y,mouse_button_t button) {
 	mouse_down = false;
 	mouse_x = x;
 	mouse_y = y;
@@ -721,10 +734,10 @@ bool main_game_t::on_mouse_up(int x,int y,mouse_button_t button,const input_key_
 	case MODE_LOAD:
 		break;
 	case MODE_FLOOR:
-		floor->on_mouse_up(mapped_x,mapped_y,button,map,mouse);
+		floor->on_mouse_up(mapped_x,mapped_y,button,keys(),mouse());
 		break;
 	case MODE_CEILING:
-		ceiling->on_mouse_up(mapped_x,mapped_y,button,map,mouse);
+		ceiling->on_mouse_up(mapped_x,mapped_y,button,keys(),mouse());
 		break;
 	case MODE_PLACE_OBJECT:
 		if(active_model) {
