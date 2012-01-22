@@ -749,6 +749,15 @@ int main(int argc,char** args) {
 				}
 			} catch(_discard_event& de) {}
 		}
+		// slow down if too many FPS!
+		static double last_tick = main->now_secs();
+		const double now = main->now_secs(), since_last = now-last_tick;
+		if(since_last < 0.1) {
+			SDL_Delay(10);
+			last_tick = main->now_secs();
+		} else
+			last_tick = now;
+
 	}
 	return EXIT_SUCCESS;
 }
