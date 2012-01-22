@@ -56,6 +56,8 @@
 			<asset id="collapse_boss" type="g3d" class="back" path="data/tunnel_chasm_collapse_wboss.g3d"/>
 			<asset id="idle" type="g3d" class="back" path="data/tunnel_chasm.g3d"/>
 			<asset id="collapse" type="g3d" class="back" path="data/tunnel_chasm_collapse.g3d"/>
+			<asset id="collapsed" type="g3d" class="back" path="data/tunnel_chasm_collapsed.g3d"/>
+			<asset id="collapsed_open" type="g3d" class="back" path="data/tunnel_chasm_collapsed_dooropen.g3d"/>
 		</asset>
 		<asset id="spider1" type="set" class="monster"  scale_factor="30" attack_points="10" health_points="20" attack_range="-15" defend_range="-5">
 			<asset id="idle" type="g3d" class="monster" path="data/spider1.g3d"/>

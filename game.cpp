@@ -54,7 +54,9 @@ struct rect_t {
 class main_game_t: public main_t, private main_t::file_io_t {
 public:
 	main_game_t(void* platform_ptr): main_t(platform_ptr),
-		mode(MODE_LOAD), active_model(NULL), active_object(NULL), player(NULL), bridge_broken(false), won(false), mouse_down(false) {}
+		mode(MODE_LOAD), active_model(NULL), active_object(NULL), player(NULL), 
+		bridge_broken(false), won(false), exit(false), exited(false),
+		mouse_down(false) {}
 	void init();
 	bool tick();
 	void on_io(const std::string& name,bool ok,const std::string& bytes,intptr_t data);
@@ -112,7 +114,7 @@ private:
 	typedef std::vector<hot_t> hots_t;
 	hots_t hots;
 	hot_t new_hot, active_hot;
-	bool bridge_broken, won;
+	bool bridge_broken, won, exit, exited;
 	bool draw_hot;
 	bool mouse_down;
 	float mouse_x, mouse_y;
@@ -471,9 +473,10 @@ struct main_game_t::object_t {
 			if(is_dead()) {
 				bury = true;
 				return;
-			} else if(action[state] == "collapse") { // bridge
-				set_action(state,"collapsed");
-			} else {
+			} else if(action[state] == "collapse" || action[state] == "collapse_boss") { // bridge
+				set_action(state,artwork.game.won?"collapsed_open":"collapsed");
+				artwork.game.exit = true;
+			} else if(action[state] != "collapsed_open" && action[state] != "collapsed") {
 				active_artwork[state] = artwork.get_child(action[state]);
 				animation_start[state] = artwork.game.now_secs();
 			}
@@ -620,7 +623,7 @@ bool main_game_t::tick() {
 		artwork["SPLASH"]->draw(rect_t(glm::vec2(-1,-1),glm::vec2(1,1)),glm::mat4(),glm::vec4(1,1,1,1));
 		return true;
 	} else if(mode == MODE_PLAY) {
-		if(won && balrog->bury) {
+		if(exited) {
 			artwork["WIN"]->draw(rect_t(glm::vec2(-1,-1),glm::vec2(1,1)),glm::mat4(),glm::vec4(1,1,1,1));
 			return true;
 		}
@@ -629,10 +632,10 @@ bool main_game_t::tick() {
 			return true;
 		}
 		play_tick(since_last);
-		if(won)
-			screen_centre = balrog->pos + balrog->artwork.rect().centre();
+		if(won && !balrog->bury)
+			screen_centre = balrog->pos - balrog->artwork.rect().centre();
 		else
-			screen_centre = player->pos + player->artwork.rect().centre();
+			screen_centre = player->pos - player->artwork.rect().centre();
 	} else
 		screen_centre += pan_rate * glm::vec2(since_last,since_last);
 	screen.bl = glm::vec2(screen_centre.x-width/2,screen_centre.y-height/2);
@@ -672,7 +675,7 @@ bool main_game_t::tick() {
 			new_hot.draw(*this,projection,glm::vec4(1,1,0,1));
 		for(hots_t::iterator i=hots.begin(); i!=hots.end(); i++)
 			i->draw(*this,projection,glm::vec4(0,1,0,1));
-		// floor and ceiling ## hide for production	
+		// floor and ceiling	
 		if(floor.get())
 			floor->draw(projection,glm::vec4(1,0,0,1));
 		if(ceiling.get())
@@ -754,6 +757,8 @@ void main_game_t::play_tick(float step) {
 					}
 					break;
 				case hot_t::STOP:
+					if(exit)
+						exited = true; // any stop zone will work, so you can escape from the wrong side of the bridge
 					move.x = 0; // stop lateral movement in that direction
 					break;
 				default:;
