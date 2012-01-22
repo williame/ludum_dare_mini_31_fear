@@ -22,22 +22,29 @@
 		<asset id="m03" type="g3d" class="monster" path="data/balrog fireball idle.G3D" scale_factor="30"/>
 		<asset id="m05" type="g3d" class="monster" path="data/bat_fly.g3d" scale_factor="60"/>
 		<asset id="m06" type="g3d" class="monster" path="data/bat_hang.g3d" scale_factor="60"/>
-		<asset id="p01" type="g3d" class="player" path="data/girl run.G3D" scale_factor="50" speed="250" animation_length="0.7"/>
+		<asset id="p01" type="g3d" class="player" path="data/girl run v3.G3D" scale_factor="50" speed="250" animation_length="0.7"/>
 	</artwork>
 	<level>
 		<object asset="b02" x="-475" y="17"/>
 		<object asset="b05" x="-42" y="18"/>
 		<object asset="b08" x="394" y="18"/>
 		<object asset="b09" x="1041" y="18"/>
-		<object asset="b10" x="1214" y="351"/>
-		<object asset="b02" x="1647" y="350"/>
-		<object asset="b03" x="1622" y="77"/>
 		<object asset="b05" x="1633" y="-173"/>
 		<object asset="m03" x="-482" y="-81"/>
 		<object asset="p01" x="31" y="-79"/>
 		<object asset="m02" x="571" y="-72"/>
 		<object asset="b13" x="2282" y="-173"/>
-		<hot x1="1753" y1="499" x2="1978" y2="-43" type="stop"/>
+		<object asset="b17" x="1845" y="250"/>
+		<object asset="b10" x="2438" y="307"/>
+		<object asset="b15" x="1198" y="309"/>
+		<object asset="b16" x="3031" y="308"/>
+		<object asset="b01" x="2873" y="306"/>
+		<object asset="b14" x="3003" y="-39"/>
+		<object asset="b14" x="3003" y="127"/>
+		<hot x1="865" y1="201" x2="1005" y2="492" type="stop"/>
+		<hot x1="3079" y1="169" x2="3277" y2="591" type="stop"/>
+		<hot x1="3064" y1="-291" x2="3313" y2="196" type="stop"/>
+		<hot x1="-797" y1="-99" x2="-680" y2="194" type="stop"/>
 		<floor>
 			<node id="0" x="-690" y="-82"/>
 			<node id="1" x="962" y="-77"/>
@@ -65,7 +72,28 @@
 			<node id="24" x="2632" y="-247"/>
 			<node id="25" x="2708" y="-262"/>
 			<node id="26" x="2738" y="-269"/>
-			<node id="27" x="3020" y="-269"/>
+			<node id="27" x="3114" y="-269"/>
+			<node id="29" x="1778" y="-17"/>
+			<node id="30" x="1798" y="19"/>
+			<node id="31" x="1826" y="21"/>
+			<node id="32" x="1845" y="53"/>
+			<node id="33" x="1886" y="53"/>
+			<node id="34" x="1900" y="86"/>
+			<node id="35" x="1931" y="87"/>
+			<node id="36" x="1934" y="116"/>
+			<node id="37" x="1965" y="118"/>
+			<node id="38" x="1975" y="148"/>
+			<node id="39" x="2002" y="152"/>
+			<node id="40" x="2024" y="194"/>
+			<node id="41" x="2034" y="203"/>
+			<node id="42" x="2145" y="207"/>
+			<node id="43" x="2516" y="210"/>
+			<node id="44" x="3095" y="209"/>
+			<node id="46" x="1893" y="194"/>
+			<node id="47" x="1713" y="216"/>
+			<node id="48" x="1540" y="218"/>
+			<node id="49" x="1001" y="210"/>
+			<node id="50" x="1994" y="195"/>
 			<link a="0" b="1"/>
 			<link a="1" b="2"/>
 			<link a="2" b="3"/>
@@ -78,12 +106,10 @@
 			<link a="9" b="10"/>
 			<link a="10" b="11"/>
 			<link a="11" b="12"/>
-			<link a="13" b="15"/>
 			<link a="15" b="16"/>
 			<link a="16" b="17"/>
 			<link a="17" b="18"/>
 			<link a="18" b="19"/>
-			<link a="19" b="20"/>
 			<link a="20" b="3"/>
 			<link a="12" b="21"/>
 			<link a="21" b="22"/>
@@ -92,19 +118,76 @@
 			<link a="24" b="25"/>
 			<link a="25" b="26"/>
 			<link a="26" b="27"/>
+			<link a="15" b="29"/>
+			<link a="29" b="30"/>
+			<link a="30" b="31"/>
+			<link a="31" b="32"/>
+			<link a="32" b="33"/>
+			<link a="33" b="34"/>
+			<link a="34" b="35"/>
+			<link a="35" b="36"/>
+			<link a="36" b="37"/>
+			<link a="37" b="38"/>
+			<link a="38" b="39"/>
+			<link a="39" b="40"/>
+			<link a="40" b="41"/>
+			<link a="41" b="42"/>
+			<link a="42" b="43"/>
+			<link a="43" b="44"/>
+			<link a="46" b="47"/>
+			<link a="47" b="48"/>
+			<link a="48" b="49"/>
+			<link a="50" b="46"/>
 		</floor>
 		<ceiling>
 			<node id="0" x="-695" y="113"/>
 			<node id="1" x="998" y="115"/>
-			<node id="2" x="1131" y="178"/>
+			<node id="2" x="1133" y="178"/>
 			<node id="3" x="1357" y="179"/>
 			<node id="4" x="1401" y="177"/>
 			<node id="5" x="1838" y="175"/>
+			<node id="9" x="3097" y="-74"/>
+			<node id="10" x="2699" y="-77"/>
+			<node id="11" x="2623" y="-40"/>
+			<node id="12" x="2552" y="-30"/>
+			<node id="13" x="2467" y="-27"/>
+			<node id="14" x="2409" y="-28"/>
+			<node id="15" x="2334" y="-38"/>
+			<node id="16" x="2273" y="-73"/>
+			<node id="17" x="2252" y="-78"/>
+			<node id="18" x="1410" y="-78"/>
+			<node id="19" x="1352" y="-64"/>
+			<node id="20" x="1316" y="-45"/>
+			<node id="21" x="1273" y="-22"/>
+			<node id="22" x="1269" y="-17"/>
+			<node id="24" x="1134" y="175"/>
+			<node id="25" x="1394" y="170"/>
+			<node id="26" x="1545" y="172"/>
+			<node id="27" x="989" y="401"/>
+			<node id="29" x="2104" y="406"/>
+			<node id="30" x="3093" y="403"/>
 			<link a="0" b="1"/>
 			<link a="1" b="2"/>
+			<link a="9" b="9"/>
+			<link a="9" b="10"/>
+			<link a="10" b="11"/>
+			<link a="11" b="12"/>
+			<link a="12" b="13"/>
+			<link a="13" b="14"/>
+			<link a="14" b="15"/>
+			<link a="15" b="16"/>
+			<link a="16" b="17"/>
+			<link a="17" b="18"/>
+			<link a="18" b="19"/>
+			<link a="19" b="20"/>
+			<link a="20" b="21"/>
+			<link a="21" b="22"/>
+			<link a="24" b="2"/>
 			<link a="2" b="3"/>
-			<link a="3" b="4"/>
-			<link a="4" b="5"/>
+			<link a="3" b="25"/>
+			<link a="25" b="26"/>
+			<link a="27" b="29"/>
+			<link a="29" b="30"/>
 		</ceiling>
 	</level>
 </game>

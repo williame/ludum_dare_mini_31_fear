@@ -62,9 +62,11 @@ private:
 	glm::vec2 pan_rate, active_object_anchor;
 	object_t* player;
 	struct hot_t {
+		hot_t(): type(BAD) {}
 		glm::vec2 a, b;
 		enum {
 			STOP,
+			BAD
 		} type;
 		void draw(main_t& main,const glm::mat4& mvp,glm::vec4 colour);
 		void normalise() {
@@ -79,7 +81,7 @@ private:
 	};
 	typedef std::vector<hot_t> hots_t;
 	hots_t hots;
-	hot_t hot;
+	hot_t new_hot, active_hot;
 	bool draw_hot;
 	bool mouse_down;
 	float mouse_x, mouse_y;
@@ -229,16 +231,15 @@ void main_game_t::on_ready(artwork_t*) {
 			objects.push_back(new object_t(*artwork[asset],glm::vec2(x,y)));
 		}
 		for(int i=0; xml.get_child("hot",i); i++, xml.up()) {
-			hot_t hot;
-			hot.a.x = xml.value_float("x1");
-			hot.a.y = xml.value_float("y1");
-			hot.b.x = xml.value_float("x2");
-			hot.b.y = xml.value_float("y2");
-			hot.normalise();
+			new_hot.a.x = xml.value_float("x1");
+			new_hot.a.y = xml.value_float("y1");
+			new_hot.b.x = xml.value_float("x2");
+			new_hot.b.y = xml.value_float("y2");
+			new_hot.normalise();
 			const std::string type = xml.value_string("type");
-			if(type == "stop") hot.type = hot_t::STOP;
+			if(type == "stop") new_hot.type = hot_t::STOP;
 			else data_error("unsupported hot type " << type);
-			hots.push_back(hot);
+			hots.push_back(new_hot);
 		}
 		xml.get_child("floor");
 		floor.reset(new path_t(*this));
@@ -282,15 +283,15 @@ bool main_game_t::tick() {
 				light0,glm::vec4(1,.6,.6,.6));
 		}
 		if((mode == MODE_HOT) && draw_hot)
-			hot.draw(*this,projection,glm::vec4(1,1,0,1));
+			new_hot.draw(*this,projection,glm::vec4(1,1,0,1));
 		for(hots_t::iterator i=hots.begin(); i!=hots.end(); i++)
 			i->draw(*this,projection,glm::vec4(0,1,0,1));
+		// floor and ceiling ## hide for production	
+		if(floor.get())
+			floor->draw(projection,glm::vec4(1,0,0,1));
+		if(ceiling.get())
+			ceiling->draw(projection,glm::vec4(1,1,0,1));
 	}
-	// floor and ceiling ## hide for production	
-	if(floor.get())
-		floor->draw(projection,glm::vec4(1,0,0,1));
-	if(ceiling.get())
-		ceiling->draw(projection,glm::vec4(1,1,0,1));
 	// done
 	last_tick = now;
 	return true; // return false to exit program
@@ -312,11 +313,7 @@ void main_game_t::play_tick(float step) {
 				move.y = jump_up;
 		} else {
 			assert(player->state == object_t::WALKING);
-			floor_y -= player_pos.y;
-			if(floor_y > player_pos.y)
-				move.y = floor_y;
-			else if(floor_y < player_pos.y)
-				move.y = std::min(floor_y,step);
+			move.y = floor_y-player_pos.y;
 		}
 	} else // else path says stop; play a bump sound?
 		move.x = 0;
@@ -414,7 +411,7 @@ bool main_game_t::on_key_down(short code,const input_key_map_t& map,const input_
 		case KEY_UP:
 			if(player->state == object_t::WALKING) {
 				player->jump_gravity = 0;
-				player->jump_energy = 200;
+				player->jump_energy = 160;
 				player->jump_dir = player->dir;
 				player->state = object_t::JUMPING;
 			}
@@ -479,7 +476,7 @@ bool main_game_t::on_key_up(short code,const input_key_map_t& map,const input_mo
 	if(mode == MODE_PLAY) {
 		switch(code) {
 		case KEY_UP:
-			player->jump_energy *= 0.7; // stop them jumping full-apogee
+			player->jump_energy *= 0.6; // stop them jumping full-apogee
 			break;
 		case KEY_LEFT:
 		case KEY_RIGHT:
@@ -516,14 +513,14 @@ bool main_game_t::on_key_up(short code,const input_key_map_t& map,const input_mo
 			if(mouse_down || !draw_hot) return false;
 			switch(code) {
 			case 'x':
-				hot.type = hot_t::STOP;
+				new_hot.type = hot_t::STOP;
 				std::cout << "HOT is STOP" << std::endl;
 				break;
 			default:
 				return false;
 			} 
-			hot.normalise();
-			hots.push_back(hot);
+			new_hot.normalise();
+			hots.push_back(new_hot);
 			draw_hot = false;
 			return true;
 		default: return false;
@@ -574,9 +571,9 @@ bool main_game_t::on_mouse_down(int x,int y,mouse_button_t button,const input_ke
 		break;
 	case MODE_HOT:
 		if(!draw_hot)
-			hot.a = glm::vec2(mapped_x,mapped_y);
+			new_hot.a = glm::vec2(mapped_x,mapped_y);
 		draw_hot = true;
-		hot.b = glm::vec2(mapped_x,mapped_y);
+		new_hot.b = glm::vec2(mapped_x,mapped_y);
 		break;
 	default:;
 	}
