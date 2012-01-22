@@ -41,6 +41,20 @@ bool path_t::y_at(const glm::vec2& p,float& y,bool down) const {
 	return found;
 }
 
+glm::vec2 path_t::route(const glm::vec2& from,float distance,const glm::vec2& to,bool down) const {
+	assert(down);
+	// we are just going to probe left/right, no clever going upstairs
+	float y;
+	if(from.x < to.x) {
+		if(y_at(from+glm::vec2(distance,0),y,down))
+			return glm::vec2(from.x+distance,y);
+	} else if(from.x > to.x) {
+		if(y_at(from+glm::vec2(-distance,0),y,down))
+			return glm::vec2(from.x-distance,y);
+	}
+	return glm::vec2(); //###
+}
+
 path_t::node_t* path_t::get_node(int id,bool null) {
 	for(nodes_t::iterator i=nodes.begin(); i!=nodes.end(); i++)
 		if((*i)->id == id) return *i;

@@ -62,6 +62,7 @@ private:
 	object_t* active_object;
 	glm::vec2 pan_rate, active_object_anchor;
 	object_t* player;
+	glm::vec2 player_centre;
 	struct hot_t {
 		hot_t(): type(BAD) {}
 		glm::vec2 a, b;
@@ -102,7 +103,7 @@ struct main_game_t::artwork_t {
 	const std::string id, name;
 	const class_t cls;
 	const glm::mat4 tx;
-	const glm::vec4 anchor;
+	const glm::vec3 anchor;
 	const float scale_factor, speed, animation_length;
 	virtual void draw(float time,const glm::mat4& projection,const glm::mat4& modelview,const glm::vec3& light0,const glm::vec4& colour = glm::vec4(1,1,1,1)) = 0;
 	virtual artwork_t* get_child(const std::string& id) = 0;
@@ -118,7 +119,7 @@ protected:
 	artwork_t(main_game_t& g,const std::string& id_,const std::string& n,class_t c,float sf,const glm::vec3& a,float sp,float al):
 		game(g), id(id_), name(n), cls(c),
 		tx(glm::scale(glm::vec3(sf,sf,sf))),
-		anchor(glm::scale(glm::vec3(sf,sf,sf))*glm::vec4(a,1)),
+		anchor(a),
 		scale_factor(sf), speed(sp), animation_length(al) {}
 };
 
@@ -252,7 +253,7 @@ main_game_t::artwork_t* main_game_t::load_asset(xml_walker_t& xml,float sf,float
 
 struct main_game_t::object_t {
 	object_t(artwork_t& a,const glm::vec2& p):
-		artwork(a), pos(p), state(WALKING) {
+		artwork(a), pos(p), state(WALKING), attacking(false) {
 			dir[WALKING] = dir[JUMPING] = EDITOR;
 			action[WALKING] = action[JUMPING] = "idle";
 			active_artwork[WALKING] = active_artwork[JUMPING] = artwork.get_child("idle");
@@ -271,6 +272,7 @@ struct main_game_t::object_t {
 		EDITOR = 0,
 		RIGHT = 1
 	} dir[STATE_LAST];
+	bool attacking;
 	double jump_gravity, jump_energy;
 	artwork_t* active_artwork[STATE_LAST];
 	double animation_start[STATE_LAST], speed[STATE_LAST];
@@ -295,7 +297,7 @@ struct main_game_t::object_t {
 		active_artwork[state]->draw(time,projection,tx(),light0,colour);		
 	}
 	glm::mat4 tx() {
-		glm::mat4 tx(glm::translate(glm::vec3(pos,-artwork.cls))*artwork.tx);
+		glm::mat4 tx(glm::translate(glm::vec3(pos.x-artwork.anchor.x,pos.y-artwork.anchor.y,-artwork.cls))*artwork.tx);
 		if(dir[WALKING] == LEFT) // WALKING defines facing, even if completing a jump in another direction
 			tx *= glm::rotate(270.0f,glm::vec3(0,1,0));
 		else if(dir[WALKING] == RIGHT)
@@ -405,11 +407,11 @@ bool main_game_t::tick() {
 		since_last = now-last_tick;
 	if(mode == MODE_PLAY) {
 		play_tick(since_last);
-		screen_centre = player->pos;
+		screen_centre = player->pos + player_centre;
 	} else
 		screen_centre += pan_rate * glm::vec2(since_last,since_last);
 	const glm::mat4 projection(glm::ortho<float>(
-		screen_centre.x-width/2,screen_centre.x+width/2,
+		screen_centre.x-width/2,screen_centre.x+width/2, // 0,0 is screen centre
 		screen_centre.y-height/2,screen_centre.y+height/2, // y increases upwards
 		1,300));
 	const glm::vec3 light0(10,10,10);
@@ -441,42 +443,61 @@ bool main_game_t::tick() {
 
 void main_game_t::play_tick(float step) {
 	// move main player
-	glm::vec2 move(player->speed[player->state] * step * player->dir[player->state],0),
-		player_pos(glm::vec2(player->artwork.anchor.x,player->artwork.anchor.y)+player->pos);
-	float floor_y;
-	if(floor->y_at(player_pos,floor_y,true)) {
-		if(player->state == object_t::JUMPING) {
-			player->jump_gravity += 4.0*step;
-			const double jump_up = player->jump_energy*step - player->jump_gravity;
-			if(jump_up+player_pos.y < floor_y) {
-				move.y = floor_y-player_pos.y;
-				player->set_state(object_t::WALKING);
-				if(keys()[KEY_UP]) // still pressed? jump again
-					on_key_down(KEY_UP);
-			} else
-				move.y = jump_up;
-		}
-		if(player->state == object_t::WALKING) {
-			if(player->speed[player->state])
-				player->set_action(player->state,"run");
-			else if(keys()[' ']) // attacking?
-				player->set_action(player->state,"attack");
-			else
-				player->set_action(player->state,"idle");
-			move.y = floor_y-player_pos.y;
-		}
-	} else // else path says stop; play a bump sound?
-		move.x = 0;
-	glm::vec2 new_pos = player->pos + move;
-	for(hots_t::iterator i=hots.begin(); i!=hots.end(); i++)
-		if(i->contains(new_pos))
-			switch(i->type) {
-			case hot_t::STOP:
-				move.x = 0; // stop lateral movement in that direction
-				break;
-			default:;
+	{
+		glm::vec2 move(player->speed[player->state] * step * player->dir[player->state],0),
+			player_pos(glm::vec2(player->artwork.anchor.x,player->artwork.anchor.y)+player->pos);
+		float floor_y;
+		if(floor->y_at(player_pos,floor_y,true)) {
+			if(player->state == object_t::JUMPING) {
+				player->jump_gravity += 4.0*step;
+				const double jump_up = player->jump_energy*step - player->jump_gravity;
+				if(jump_up+player_pos.y < floor_y) {
+					move.y = floor_y-player_pos.y;
+					player->set_state(object_t::WALKING);
+					if(keys()[KEY_UP]) // still pressed? jump again
+						on_key_down(KEY_UP);
+				} else
+					move.y = jump_up;
 			}
-	player->pos += move;
+			if(player->state == object_t::WALKING) {
+				player->attacking = !player->speed[player->state] && keys()[' '];
+				if(player->attacking)
+					player->set_action(player->state,"attack");
+				else if(player->speed[player->state])
+					player->set_action(player->state,"run");
+				else
+					player->set_action(player->state,"idle");
+				move.y = floor_y-player_pos.y;
+			}
+		} else // else path says stop; play a bump sound?
+			move.x = 0;
+		glm::vec2 new_pos = player->pos + move;
+		for(hots_t::iterator i=hots.begin(); i!=hots.end(); i++)
+			if(i->contains(new_pos))
+				switch(i->type) {
+				case hot_t::STOP:
+					move.x = 0; // stop lateral movement in that direction
+					break;
+				default:;
+				}
+		player->pos += move;
+	}
+	// move all monsters
+	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++)
+		if((*i)->artwork.cls == artwork_t::CLS_MONSTER) {
+			object_t& monster = **i;
+			if(monster.pos.x < player->pos.x) {
+				monster.set_action(monster.state,"run");
+				monster.dir[monster.state] = object_t::RIGHT;
+			} else if(monster.pos.x > player->pos.x) {
+				monster.set_action(monster.state,"run");
+				monster.dir[monster.state] = object_t::LEFT;
+			} else
+				monster.set_action(monster.state,"idle");
+			const float speed = monster.active_artwork[monster.state]->speed;
+			glm::vec2 move = floor->route(monster.pos,speed*step,player->pos,true);
+			monster.pos = move;
+		}
 }
 
 void main_game_t::save() {
@@ -516,7 +537,8 @@ void main_game_t::save() {
 void main_game_t::play() {
 	// find player object
 	player = NULL;
-	for(objects_t::iterator o=objects.begin(); o!=objects.end(); o++)
+	for(objects_t::iterator o=objects.begin(); o!=objects.end(); o++) {
+		(*o)->set_state(object_t::WALKING);
 		if((*o)->artwork.cls == artwork_t::CLS_PLAYER) {
 			if(player) {
 				std::cerr << "There is more than one player!  Cannot play." << std::endl;
@@ -525,6 +547,7 @@ void main_game_t::play() {
 			} else
 				player = *o;
 		}
+	}
 	if(!player) {
 		std::cerr << "There is no player!  Cannot play." << std::endl;
 		return;
@@ -535,6 +558,10 @@ void main_game_t::play() {
 	}
 	mode = MODE_PLAY;
 	pan_rate = glm::vec2(0,0);
+	glm::vec3 min, max;
+	player->artwork.bounds(min,max);
+	glm::vec4 sz = player->artwork.tx*glm::vec4(max-min,1.);
+	player_centre = glm::vec2(sz.x/2,sz.y/2);
 	glClearColor(0,0,0,1);
 	std::cout << "Playing game!" << std::endl;
 }
@@ -549,7 +576,8 @@ bool main_game_t::on_key_down(short code) {
 				player->dir[object_t::JUMPING] = player->dir[object_t::WALKING];
 				player->speed[object_t::JUMPING] = player->speed[object_t::WALKING];
 				player->set_state(object_t::JUMPING);
-				player->set_action(player->state,keys()[' ']?"jump_attack":"jump");
+				player->attacking = keys()[' '];
+				player->set_action(player->state,player->attacking?"jump_attack":"jump");
 			}
 			break;
 		case KEY_LEFT:
@@ -566,10 +594,12 @@ bool main_game_t::on_key_down(short code) {
 			break;
 		case ' ':
 			if(player->state == object_t::JUMPING) {
+				player->attacking = true;
 				player->set_action(object_t::JUMPING,"jump_attack");
 			} else {
 				assert(player->state == object_t::WALKING);
 				if(player->speed[object_t::WALKING] == 0) { // no attack whilst running
+					player->attacking = true;
 					player->set_action(object_t::WALKING,"attack");
 				}
 			}

@@ -17,12 +17,24 @@
 		<asset id="b15" class="back" type="g3d" path="data/tunnel_end_left.g3d" scale_factor="30"/>
 		<asset id="b16" class="back" type="g3d" path="data/tunnel_end_right.g3d" scale_factor="30"/>
 		<asset id="b17" class="back" type="g3d" path="data/tunnel_updown2.g3d" scale_factor="30"/>
-		<asset id="m01" class="monster" type="g3d" path="data/spider1.g3d" scale_factor="30"/>
-		<asset id="m02" class="monster" type="g3d" path="data/spider_run.g3d" scale_factor="30"/>
-		<asset id="m03" class="monster" type="g3d" path="data/balrog fireball idle.G3D" scale_factor="30"/>
-		<asset id="m05" class="monster" type="g3d" path="data/bat_fly.g3d" scale_factor="60"/>
-		<asset id="m06" class="monster" type="g3d" path="data/bat_hang.g3d" scale_factor="60"/>
-		<asset id="p01" class="player" type="set" scale_factor="50" speed="1">
+		<asset id="spider1" class="monster" type="set" scale_factor="30" speed="1">
+			<asset id="idle" class="monster" type="g3d" path="data/spider1.g3d"/>
+			<asset id="run" class="monster" type="g3d" path="data/spider_run.g3d" speed="40"/>
+		</asset>
+		<asset id="bat1" class="monster" type="set" scale_factor="60" speed="1" anchor_y="-100">
+			<asset id="run" class="monster" type="g3d" path="data/bat_fly.g3d" speed="80"/>
+			<asset id="idle" class="monster" type="g3d" path="data/bat_hang.g3d"/>
+		</asset>
+		<asset id="balrog1" class="monster" type="set" scale_factor="30" speed="1">
+			<asset id="pitfall" class="monster" type="g3d" path="data/ballrog pitfall.G3D"/>
+			<asset id="attack" class="monster" type="g3d" path="data/balrog attack.G3D"/>
+			<asset id="idle" class="monster" type="g3d" path="data/balrog fireball idle.G3D"/>
+			<asset id="idle" class="monster" type="g3d" path="data/balrog idle.G3D"/>
+			<asset id="start" class="monster" type="g3d" path="data/balrog idle to walk.G3D"/>
+			<asset id="run" class="monster" type="g3d" path="data/balrog walk.G3D" speed="30"/>
+			<asset id="stop" class="monster" type="g3d" path="data/balrog walk to idle.G3D"/>
+		</asset>
+		<asset id="player1" class="player" type="set" scale_factor="50" speed="1">
 			<asset id="run" class="player" type="g3d" path="data/girl run v3.G3D" speed="250" animation_length="0.7"/>
 			<asset id="jump" class="player" type="g3d" path="data/girl jump.G3D" speed="150" animation_length="2"/>
 			<asset id="attack" class="player" type="g3d" path="data/girl attack.G3D" animation_length="0.7"/>
@@ -45,9 +57,10 @@
 		<object asset="b08" x="394" y="18"/>
 		<object asset="b09" x="1041" y="18"/>
 		<object asset="b05" x="1633" y="-173"/>
-		<object asset="m03" x="-482" y="-81"/>
-		<object asset="p01" x="31" y="-79"/>
-		<object asset="m02" x="571" y="-72"/>
+		<object asset="balrog1" x="-482" y="-81"/>
+		<object asset="player1" x="31" y="-79"/>
+		<object asset="spider1" x="571" y="-72"/>
+		<object asset="bat1" x="571" y="-72"/>
 		<object asset="b13" x="2282" y="-173"/>
 		<object asset="b17" x="1845" y="250"/>
 		<object asset="b10" x="2438" y="307"/>

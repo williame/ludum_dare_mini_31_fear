@@ -15,6 +15,7 @@ public:
 	void save(std::stringstream& xml) const;
 	void draw(const glm::mat4& projection,const glm::vec4& colour);
 	bool y_at(const glm::vec2& p,float& y,bool down) const;
+	glm::vec2 route(const glm::vec2& from,float distance,const glm::vec2& to,bool down) const;
 	void on_mouse_down(int x,int y,main_t::mouse_button_t button,const main_t::input_key_map_t& map,const main_t::input_mouse_map_t& mouse);
 	void on_mouse_up(int x,int y,main_t::mouse_button_t button,const main_t::input_key_map_t& map,const main_t::input_mouse_map_t& mouse);
 	bool on_key_down(short code,const main_t::input_key_map_t& map,const main_t::input_mouse_map_t& mouse);

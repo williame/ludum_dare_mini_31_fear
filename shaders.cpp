@@ -22,7 +22,7 @@ void create_shaders(main_t& main) {
 		"varying vec3 normal;\n"
 		"void main() {\n"
 		"	vec3 texel = texture2D(TEX_UNIT_0,tex_coord_0).rgb;\n"
-		"	float intensity = min(max(dot(LIGHT_0,normal),.4)*.8,1.);\n"
+		"	float intensity = min(max(dot(LIGHT_0,normal),.6),1.);\n"
 		"	gl_FragColor = vec4(COLOUR.rgb * texel * intensity,COLOUR.a);\n"
 		"}\n"));
 	main.set_shared_program("g3d_multi_frame",main.create_program(
