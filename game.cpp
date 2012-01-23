@@ -230,6 +230,11 @@ struct artwork_splash_t: public main_game_t::artwork_t, private main_t::texture_
 		glCheck();
 		glDrawArrays(GL_TRIANGLE_STRIP,0,4);
 		glDeleteBuffers(1,&vbo);
+		glDisableVertexAttribArray(attrib_vertex);
+		glDisableVertexAttribArray(attrib_tex);
+		glBindTexture(GL_TEXTURE_2D,0);
+		glBindBuffer(GL_ARRAY_BUFFER,0);
+		glUseProgram(0);
 		glCheck();
 	}
 	artwork_t* get_child(const std::string& id) { return this; }
@@ -538,6 +543,10 @@ void rect_t::draw(main_t& main,const glm::mat4& mvp,glm::vec4 colour) {
 	glVertexAttribPointer(attrib_vertex,2,GL_FLOAT,GL_FALSE,0,0);
 	glDrawArrays(GL_LINE_LOOP,0,4);
 	glDeleteBuffers(1,&vbo);
+	glDisableVertexAttribArray(attrib_vertex);
+	glBindBuffer(GL_ARRAY_BUFFER,0);
+	glUseProgram(0);
+	glCheck();
 }
 
 void main_game_t::init() {
@@ -957,15 +966,15 @@ bool main_game_t::on_key_down(short code) {
 	case KEY_RIGHT: pan_rate.x = PAN_RATE; return true;
 	case KEY_UP: pan_rate.y = PAN_RATE; return true;
 	case KEY_DOWN: pan_rate.y = -PAN_RATE; return true;
-	case 'h': mode = MODE_HOT; draw_hot = false; std::cout << "HOT ZONE MODE" << std::endl; return true;
-	case 'f': mode = MODE_FLOOR; std::cout << "FLOOR MODE" << std::endl; return true;
-	case 'c': mode = MODE_CEILING; std::cout << "CEILING MODE" << std::endl; return true;
-	case 'e': 
+	case 'h': case 'H': mode = MODE_HOT; draw_hot = false; std::cout << "HOT ZONE MODE" << std::endl; return true;
+	case 'f': case 'F': mode = MODE_FLOOR; std::cout << "FLOOR MODE" << std::endl; return true;
+	case 'c': case 'C': mode = MODE_CEILING; std::cout << "CEILING MODE" << std::endl; return true;
+	case 'e': case 'E':
 		active_object = NULL;
 		mode = MODE_EDIT_OBJECT;
 		std::cout << "OBJECT EDIT MODE " << (active_object?active_object->artwork.id:"<no selection>") << std::endl; 
 		return true;
-	case 'o':
+	case 'o': case 'O':
 		if(mode == MODE_PLACE_OBJECT) {
 			if(!artwork.size()) return false;
 			bool next = false;
@@ -982,7 +991,7 @@ bool main_game_t::on_key_down(short code) {
 		mode = MODE_PLACE_OBJECT;
 		std::cout << "OBJECT PLACEMENT MODE " << active_model->id << std::endl; 
 		return true;
-	case 'p':
+	case 'p': case 'P':
 		play();
 		return true;
 	default:
@@ -1032,7 +1041,7 @@ bool main_game_t::on_key_up(short code) {
 	case KEY_RIGHT: pan_rate.x = 0; return true;
 	case KEY_UP:
 	case KEY_DOWN: pan_rate.y = 0; return true;
-	case 's': if(keys().none()) save(); return true;
+	case 's': case 'S': if(keys().none()) save(); return true;
 	default:
 		switch(mode) {
 		case MODE_EDIT_OBJECT:
@@ -1053,11 +1062,11 @@ bool main_game_t::on_key_up(short code) {
 		case MODE_HOT:
 			if(mouse_down || !draw_hot) return false;
 			switch(code) {
-			case 'x':
+			case 'x': case 'X':
 				new_hot.type = hot_t::STOP;
 				std::cout << "HOT is STOP" << std::endl;
 				break;
-			case 'b':
+			case 'b': case 'B':
 				new_hot.type = hot_t::BRIDGE;
 				std::cout << "HOT is BRIDGE" << std::endl;
 				break;
@@ -1074,6 +1083,8 @@ bool main_game_t::on_key_up(short code) {
 }
 
 bool main_game_t::on_mouse_down(int x,int y,mouse_button_t button) {
+	if(button != MOUSE_LEFT)
+		return false;
 	mouse_down = true;
 	mouse_x = x;
 	mouse_y = y;
@@ -1129,6 +1140,8 @@ bool main_game_t::on_mouse_down(int x,int y,mouse_button_t button) {
 }
 
 bool main_game_t::on_mouse_up(int x,int y,mouse_button_t button) {
+	if(button != MOUSE_LEFT)
+		return false;
 	mouse_down = false;
 	mouse_x = x;
 	mouse_y = y;
