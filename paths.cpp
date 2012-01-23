@@ -113,6 +113,7 @@ void path_t::draw(const glm::mat4& projection,const glm::vec4& colour) {
 		glLineWidth(2.);
 		glVertexAttribPointer(attrib_vertex,2,GL_FLOAT,GL_FALSE,0,0);
 		glDrawArrays(GL_LINES,0,links.size()*2);
+		glBindBuffer(GL_ARRAY_BUFFER,0);
 		glCheck();
 	}
 	if(active_node) {
@@ -148,6 +149,10 @@ void path_t::draw(const glm::mat4& projection,const glm::vec4& colour) {
 		glDrawArrays(GL_POINTS,0,nodes.size());
 		glCheck();
 	}
+	glBindBuffer(GL_ARRAY_BUFFER,0);
+	glDisableVertexAttribArray(attrib_vertex);
+	glUseProgram(0);
+	glCheck();
 	dirty = false;
 }
 
