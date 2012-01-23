@@ -14,6 +14,8 @@
 
 #include "paths.hpp"
 
+int DEBUG_LEVEL = 0; // default to 0 for release
+
 void create_shaders(main_t& main); // shaders.cpp
 
 const char* const main_t::game_name = "Ludum Dare Mini 31 - Fear"; // window titles etc
@@ -557,7 +559,10 @@ void main_game_t::on_io(const std::string& name,bool ok,const std::string& bytes
 	case LOAD_GAME_XML: {
 		game_xml = xml_parser_t(name,bytes);
 		xml_walker_t xml(game_xml.walker());
-		xml.check("game").get_child("artwork");
+		xml.check("game");
+		if(xml.has_key("debug_level"))
+			DEBUG_LEVEL = xml.value_int("debug_level");
+		xml.get_child("artwork");
 		for(int i=0; xml.get_child("asset",i); i++, xml.up()) {
 			artwork_t* a = load_asset(xml);
 			if(artwork.find(a->id) != artwork.end())
@@ -615,8 +620,8 @@ void main_game_t::on_ready(artwork_t*) {
 		xml.up();
 		glClearColor(1,1,1,1);
 		
-		//###
-		play();
+		if(!DEBUG_LEVEL) // with debug-level, we're in EDIT mode
+			play();
 	}
 }
 
@@ -654,7 +659,7 @@ bool main_game_t::tick() {
 	for(objects_t::iterator i=objects.begin(); i!=objects.end(); i++) {
 		if((*i)->is_visible(screen))
 			(*i)->draw(now,projection,light0);
-		if(false) {
+		if(DEBUG_LEVEL) {
 			if((*i)->defending)
 				(*i)->defend_rect().draw(*this,projection,glm::vec4(1,1,1,.5));
 			if((*i)->attacking)
@@ -677,6 +682,8 @@ bool main_game_t::tick() {
 		}
 		if((mode == MODE_HOT) && draw_hot)
 			new_hot.draw(*this,projection,glm::vec4(1,1,0,1));
+	}
+	if(mode != MODE_PLAY || DEBUG_LEVEL) {
 		for(hots_t::iterator i=hots.begin(); i!=hots.end(); i++)
 			i->draw(*this,projection,glm::vec4(0,1,0,1));
 		// floor and ceiling	
