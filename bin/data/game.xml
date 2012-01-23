@@ -1,4 +1,4 @@
-<game>
+<game debug_level="1">
 	<artwork>
 		<asset id="BALROG" type="set" class="monster"  scale_factor="40" attack_points="10" health_points="2.5e+06" attack_range="20" defend_range="10">
 			<asset id="pitfall" type="g3d" class="monster" path="data/ballrog pitfall.G3D" cycles="false"/>
