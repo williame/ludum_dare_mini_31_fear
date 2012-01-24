@@ -131,8 +131,13 @@ protected:
 }
 #define graphics_assert(test) if(!(test)) graphics_error(#test);
 
-#define glCheck(...) { \
+#define glAlwaysCheck(...) { \
 	if(GL_NO_ERROR != glGetError()) \
+		graphics_error(#__VA_ARGS__); \
+}
+extern bool DEBUG_CHECK_GL_ERROR; // default to FALSE in NaCl
+#define glCheck(...) { \
+	if(DEBUG_CHECK_GL_ERROR && (GL_NO_ERROR != glGetError())) \
 		graphics_error(#__VA_ARGS__); \
 }
 

@@ -1,3 +1,11 @@
+
+#if (defined(__native_client__) || defined(NDEBUG)) && !defined(GL_CHECK_ERROR)
+	// calling glGetError() is MASSIVE NaCl performance hit because it flushes the GL command buffer
+	bool DEBUG_CHECK_GL_ERROR = false;
+#else 
+	bool DEBUG_CHECK_GL_ERROR = true;
+#endif
+
 #include "main.hpp"
 #include "rand.hpp"
 #include "build_info.hpp"
